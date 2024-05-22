@@ -1,0 +1,120 @@
+{
+    "run": {
+        "task": "image_text_pretrain",
+        "lr_sched": "linear_warmup_cosine_lr",
+        "init_lr": 1e-05,
+        "min_lr": 1e-06,
+        "warmup_lr": 1e-06,
+        "weight_decay": 0.05,
+        "max_epoch": 30,
+        "num_workers": 6,
+        "iters_per_epoch": 1000,
+        "warmup_steps": 1000,
+        "seed": 42,
+        "output_dir": "/home/user/project/MiniGPT-4-main/checkpoints/save_checkpoint",
+        "amp": true,
+        "resume_ckpt_path": null,
+        "evaluate": false,
+        "train_splits": [
+            "train"
+        ],
+        "device": "cuda",
+        "world_size": 4,
+        "dist_url": "env://",
+        "distributed": true,
+        "wandb_log": false,
+        "job_name": "minigptv2_finetune",
+        "rank": 0,
+        "gpu": 0,
+        "dist_backend": "nccl"
+    },
+    "model": {
+        "arch": "minigpt_v2",
+        "image_size": 448,
+        "drop_path_rate": 0,
+        "use_grad_checkpoint": true,
+        "vit_precision": "fp16",
+        "freeze_vit": true,
+        "prompt": "",
+        "llama_model": "/home/user/project/MiniGPT-4-main/checkpoints/Llama-2-7b-chat-hf",
+        "lora_r": 64,
+        "lora_alpha": 16,
+        "model_type": "pretrain",
+        "max_txt_len": 1024,
+        "end_sym": "</s>",
+        "ckpt": "/home/user/project/MiniGPT-4-main/checkpoints/save_checkpoint/20240416112/checkpoint_7.pth",
+        "chat_template": true
+    },
+    "preprocess": {
+        "vis_processor": {
+            "train": {
+                "name": "blip2_image_train",
+                "image_size": 448
+            },
+            "eval": {
+                "name": "blip2_image_eval",
+                "image_size": 448
+            }
+        },
+        "text_processor": {
+            "train": {
+                "name": "blip_caption"
+            },
+            "eval": {
+                "name": "blip_caption"
+            }
+        }
+    },
+    "datasets": {
+        "feature_face_caption": {
+            "data_type": "images",
+            "build_info": {
+                "image_path": "/home/user/selected_face/first_face/first_frames",
+                "ann_path": "/home/user/selected_face/face_emotion/target_label_list_0512_smp.txt"
+            },
+            "batch_size": 1,
+            "vis_processor": {
+                "train": {
+                    "name": "blip2_image_train",
+                    "image_size": 448
+                }
+            },
+            "text_processor": {
+                "train": {
+                    "name": "blip_caption"
+                }
+            },
+            "sample_ratio": 30
+        }
+    }
+}
+{"train_lr": "0.000005", "train_loss": "0.332611"}
+{"train_lr": "0.000010", "train_loss": "0.195308"}
+{"train_lr": "0.000010", "train_loss": "0.099842"}
+{"train_lr": "0.000010", "train_loss": "0.048081"}
+{"train_lr": "0.000010", "train_loss": "0.030403"}
+{"train_lr": "0.000009", "train_loss": "0.023074"}
+{"train_lr": "0.000009", "train_loss": "0.021191"}
+{"train_lr": "0.000009", "train_loss": "0.013577"}
+{"train_lr": "0.000008", "train_loss": "0.003533"}
+{"train_lr": "0.000008", "train_loss": "0.000724"}
+{"train_lr": "0.000008", "train_loss": "0.020035"}
+{"train_lr": "0.000007", "train_loss": "0.002258"}
+{"train_lr": "0.000007", "train_loss": "0.000414"}
+{"train_lr": "0.000006", "train_loss": "0.000160"}
+{"train_lr": "0.000006", "train_loss": "0.000060"}
+{"train_lr": "0.000005", "train_loss": "0.000035"}
+{"train_lr": "0.000005", "train_loss": "0.000022"}
+{"train_lr": "0.000004", "train_loss": "0.000017"}
+{"train_lr": "0.000004", "train_loss": "0.000012"}
+{"train_lr": "0.000003", "train_loss": "0.000009"}
+{"train_lr": "0.000003", "train_loss": "0.000006"}
+{"train_lr": "0.000003", "train_loss": "0.000005"}
+{"train_lr": "0.000002", "train_loss": "0.000004"}
+{"train_lr": "0.000002", "train_loss": "0.000002"}
+{"train_lr": "0.000002", "train_loss": "0.000002"}
+{"train_lr": "0.000001", "train_loss": "0.000001"}
+{"train_lr": "0.000001", "train_loss": "0.000001"}
+{"train_lr": "0.000001", "train_loss": "0.000001"}
+{"train_lr": "0.000001", "train_loss": "0.000001"}
+{"train_lr": "0.000001", "train_loss": "0.000000"}
