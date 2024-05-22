@@ -11,4 +11,4 @@ By aligning features into a shared space and employing a modified LLaMA model wi
 Extensive evaluations show Emotion-LLaMA outperforms other MLLMs, achieving top scores in Clue Overlap (7.83) and Label Overlap (6.25) on EMER, an F1 score of 0.9036 on MER2023 challenge, and the highest UAR (45.59) and WAR (59.37) in zero-shot evaluations on DFEW dataset.
 
 ## Pipeline
-![pipeline](./images/pipeline_prompt.jpg)
+![pipeline](./images/framework.png)
