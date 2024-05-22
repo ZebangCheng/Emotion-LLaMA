@@ -1,0 +1,40 @@
+model:
+  arch: minigpt_v2
+  model_type: pretrain
+  max_txt_len: 500
+  end_sym: "</s>"
+  low_resource: False
+  prompt_template: '[INST] {} [/INST]'
+  llama_model: "/home/user/project/MiniGPT-4-main/checkpoints/Llama-2-7b-chat-hf"
+  ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/stage2/checkpoint_best.pth"
+  lora_r: 64
+  lora_alpha: 16
+
+datasets:    
+  feature_face_caption:  #
+    batch_size: 1
+    vis_processor:
+      train:
+        name: "blip2_image_train"
+        image_size: 448
+    text_processor:
+      train:
+        name: "blip_caption"
+    sample_ratio: 30
+
+evaluation_datasets:
+  feature_face_caption:
+    eval_file_path: /home/user/selected_face/face_emotion/relative_test3_NCEV.txt # MER2023
+
+    img_path: /home/user/selected_face/first_face/first_frames
+
+    # eval_file_path: /home/user/selected_face/DFEW/reltive_DFEW_set_1_test.txt
+    # img_path: /home/user/selected_face/DFEW/images     
+
+    max_new_tokens: 500
+    batch_size: 1
+
+run:
+  task: image_text_pretrain
+  name: minigptv2_evaluation
+  save_path: /home/user/project/MiniGPT-4-main/results
