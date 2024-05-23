@@ -36,6 +36,8 @@ In the [model config file](minigpt4/configs/models/minigpt_v2.yaml#L14), specify
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ```
 
+
+## Eval
 In the [evaluation config file](eval_configs/eval_emotion.yaml#8), specify the path to [pretrained checkpoint of Emotion-LLaMA]().  
 ```
 # set pretrained checkpoint path
@@ -43,7 +45,6 @@ llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/stage2/checkpoint_best.pth"
 ```
 
-## Run
 Run the following code to evaluate the F1 score on MER2023-SEMI:  
 ```
 torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset feature_face_caption
