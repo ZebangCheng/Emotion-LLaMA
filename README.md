@@ -21,4 +21,18 @@ git clone https://github.com/ZebangCheng/Emotion-LLaMA.git
 cd Emotion-LLaMA
 conda env create -f environment.yaml
 conda activate llama
-``` 
+```
+
+### Prepare the pretrained LLM weights
+Download the Llama-2-7b-chat-hf model from Huggingface to "Emotion-LLaMA/checkpoints/"  
+```
+https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
+```
+
+## Run
+Run the following code to evaluate the F1 score on MER2023-SEMI:  
+```
+torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset feature_face_caption
+```
+
+
