@@ -5,7 +5,7 @@ model:
   end_sym: "</s>"
   low_resource: False
   prompt_template: '[INST] {} [/INST]'
-  llama_model: "/home/user/project/MiniGPT-4-main/checkpoints/Llama-2-7b-chat-hf"
+  llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
   ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/stage2/checkpoint_best.pth"
   lora_r: 64
   lora_alpha: 16
@@ -37,4 +37,4 @@ evaluation_datasets:
 run:
   task: image_text_pretrain
   name: minigptv2_evaluation
-  save_path: /home/user/project/MiniGPT-4-main/results
+  save_path: /home/user/project/Emotion-LLaMA/results
