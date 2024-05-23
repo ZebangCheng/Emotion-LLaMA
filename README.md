@@ -36,10 +36,11 @@ In the [model config file](minigpt4/configs/models/minigpt_v2.yaml#L14), specify
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ```
 
-In the [evaluation config file](eval_configs/), specify the path to [pretrained checkpoint of MiniGPT-v2](https://drive.google.com/file/d/1aVbfW7nkCSYx99_vCRyP1sOlQiWVSnAl/view).  
+In the [evaluation config file](eval_configs/eval_emotion.yaml#8), specify the path to [pretrained checkpoint of Emotion-LLaMA]().  
 ```
 # set pretrained checkpoint path
-ckpt: "/home/bbbdbbb/project/MiniGPT-4-main/checkpoints/minigptv2_checkpoint.pth"
+llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
+ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/stage2/checkpoint_best.pth"
 ```
 
 ## Run
