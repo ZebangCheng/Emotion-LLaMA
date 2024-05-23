@@ -4,9 +4,9 @@ model:
   max_txt_len: 1024
   image_size: 448
   end_sym: "</s>"
-  llama_model: "/home/user/project/MiniGPT-4-main/checkpoints/Llama-2-7b-chat-hf"
+  llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 
-  ckpt: "/home/user/project/MiniGPT-4-main/checkpoints/minigptv2_checkpoint.pth"
+  ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/minigptv2_checkpoint.pth"
 
   use_grad_checkpoint: True
   chat_template: True
@@ -52,7 +52,7 @@ run:
   warmup_steps: 1000
 
   seed: 42
-  output_dir: "/home/user/project/MiniGPT-4-main/checkpoints/save_checkpoint"
+  output_dir: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint"
 
   amp: True
   resume_ckpt_path: null
