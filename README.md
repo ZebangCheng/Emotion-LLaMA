@@ -12,3 +12,13 @@ Extensive evaluations show Emotion-LLaMA outperforms other MLLMs, achieving top 
 
 ## Pipeline
 ![pipeline](./images/framework.png)
+
+## Setup
+### Prepare the code and the environment
+
+```
+git clone https://github.com/ZebangCheng/Emotion-LLaMA.git
+cd Emotion-LLaMA
+conda env create -f environment.yaml
+conda activate llama
+``` 
