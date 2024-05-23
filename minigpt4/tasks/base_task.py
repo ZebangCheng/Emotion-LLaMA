@@ -254,7 +254,7 @@ class BaseTask:
                     print("Attention LR:", param_group["lr"])
 
         # save random samples' name
-        save_dir = "/home/user/project/MiniGPT-4-main/checkpoints/run_samples"
+        save_dir = "/home/user/project/Emotion-LLaMA/checkpoints/run_samples"
         save_to = os.path.join(
             save_dir,
             "epoch_{}.txt".format(epoch),
