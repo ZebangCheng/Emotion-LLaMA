@@ -50,5 +50,5 @@ Run the following code to evaluate the F1 score on MER2023-SEMI:
 ```
 torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset feature_face_caption
 ```
-
+2024-05-24
 
