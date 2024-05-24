@@ -28,8 +28,7 @@ Download the Llama-2-7b-chat-hf model from Huggingface to "Emotion-LLaMA/checkpo
 ```
 https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
 ```
-
-**3. Edit config file** 
+ 
 In the [model config file](minigpt4/configs/models/minigpt_v2.yaml#L14), specify the path to [Llama-2](https://huggingface.co/meta-llama/Llama-2-7b-chat-hf).
 ```
 # set Llama-2-7b-chat-hf path
@@ -38,7 +37,9 @@ llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 
 
 ## Eval
-In the [evaluation config file](eval_configs/eval_emotion.yaml#8), specify the path to [pretrained checkpoint of Emotion-LLaMA]().  
+
+### MER2023-SEMI
+In the [evaluation config file](eval_configs/eval_emotion.yaml#L8), specify the path to [pretrained checkpoint of Emotion-LLaMA](https://github.com/ZebangCheng/Emotion-LLaMA/blob/main/README.md).  
 ```
 # set pretrained checkpoint path
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
