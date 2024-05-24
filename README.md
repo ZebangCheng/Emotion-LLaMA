@@ -10,6 +10,13 @@ Furthermore, we propose Emotion-LLaMA, a model that integrates audio, visual, an
 By aligning features into a shared space and employing a modified LLaMA model with instruction tuning, Emotion-LLaMA enhances both emotional recognition and reasoning capabilities.
 Extensive evaluations show Emotion-LLaMA outperforms other MLLMs, achieving top scores in Clue Overlap (7.83) and Label Overlap (6.25) on EMER, an F1 score of 0.9036 on MER2023 challenge, and the highest UAR (45.59) and WAR (59.37) in zero-shot evaluations on DFEW dataset.
 
+## Multimodal Emotion Recognition and Reasoning Dataset
+
+### MERR Dataset Construction
+The MERR dataset extends the range of emotional categories and annotations beyond those found in existing datasets. Each sample is annotated with an emotion label and described in terms of its emotional expression. The dataset was initially auto-annotated with coarse-grained labels for 28,618 samples from a large pool of unannotated data, and later refined to include 4,487 samples with fine-grained annotations. For more details on the data annotation process, see the [MERR](./MERR/README.md).
+
+
+
 ## Pipeline
 ![pipeline](./images/framework.png)
 
