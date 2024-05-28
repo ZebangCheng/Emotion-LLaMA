@@ -13,12 +13,12 @@ Extensive evaluations show Emotion-LLaMA outperforms other MLLMs, achieving top 
 ## MERR Dataset
 
 ### Comparison of Emotional Datasets
-The MERR dataset extends the range of emotional categories and annotations beyond those found in existing datasets. Each sample is annotated with an emotion label and described in terms of its emotional expression.
+The MERR dataset extends the range of emotional categories and annotations beyond those found in existing datasets. Each sample is annotated with an emotion label and described in terms of its emotional expression. Download the annotation content of [the MERR dataset](https://drive.google.com/drive/folders/1LSYMq2G-TaLof5xppyXcIuWiSN0ODwqG?usp=sharing).
 
 ![campare_datasets](./images/compare_datasets.jpg)
 
 ### Example of the MERR Dataset
-The dataset was initially auto-annotated with coarse-grained labels for 28,618 samples from a large pool of unannotated data, and later refined to include 4,487 samples with fine-grained annotations. For more details on the data annotation process, see the [MERR](./MERR/README.md).
+The dataset was initially auto-annotated with coarse-grained labels for 28,618 samples from a large pool of unannotated data, and later refined to include 4,487 samples with fine-grained annotations. For more details on the data annotation process, see [MERR Dataset Construction](./MERR/README.md).
 
 ![example_sample_00000047](./images/data-example_sample_00000047_add_peak_00.png)
 
@@ -30,7 +30,7 @@ The dataset was initially auto-annotated with coarse-grained labels for 28,618 s
 ### Prepare the code and the environment
 
 ```
-git clone https://github.com/ZebangCheng/Emotion-LLaMA.git
+git clone https://github.com/???/Emotion-LLaMA.git
 cd Emotion-LLaMA
 conda env create -f environment.yaml
 conda activate llama
@@ -52,7 +52,7 @@ llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ## Eval
 
 ### MER2023-SEMI
-In the [evaluation config file](eval_configs/eval_emotion.yaml#L8), specify the path to [pretrained checkpoint of Emotion-LLaMA](https://github.com/ZebangCheng/Emotion-LLaMA/blob/main/README.md).  
+In the [evaluation config file](eval_configs/eval_emotion.yaml#L8), specify the path to [pretrained checkpoint of Emotion-LLaMA](https://drive.google.com/drive/folders/1hD-d1Cu6r3nJBgUYLP30W3SJVpveoins?usp=sharing).  
 ```
 # set pretrained checkpoint path
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
@@ -63,5 +63,5 @@ Run the following code to evaluate the F1 score on MER2023-SEMI:
 ```
 torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset feature_face_caption
 ```
-2024-05-24
+
 
