@@ -65,3 +65,7 @@ torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotio
 ```
 
 
+## Acknowledgement
+- [MiniGPT-v2](https://arxiv.org/abs/2310.09478): Large Language Model as a Unified Interface for Vision-Language Multi-task Learning.
+- [AffectGPT](https://arxiv.org/abs/2306.15401): Explainable Multimodal Emotion Recognition.
+- [LLaVA](https://llava-vl.github.io/): Large Language-and-Vision Assistant.
