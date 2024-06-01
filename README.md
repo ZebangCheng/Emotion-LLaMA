@@ -10,6 +10,10 @@ Furthermore, we propose Emotion-LLaMA, a model that integrates audio, visual, an
 By aligning features into a shared space and employing a modified LLaMA model with instruction tuning, Emotion-LLaMA enhances both emotional recognition and reasoning capabilities.
 Extensive evaluations show Emotion-LLaMA outperforms other MLLMs, achieving top scores in Clue Overlap (7.83) and Label Overlap (6.25) on EMER, an F1 score of 0.9036 on MER2023 challenge, and the highest UAR (45.59) and WAR (59.37) in zero-shot evaluations on DFEW dataset.
 
+## Demo
+![dome](./images/demo_img01.png)
+![dome](./images/demo_img01.png)
+
 ## MERR Dataset
 
 ### Comparison of Emotional Datasets
@@ -51,7 +55,12 @@ llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 
 ## Eval
 
-### MER2023-SEMI
+### MER2023 Challenge
+
+To further validate the effectiveness of the Emotion-LLaMA model, we conducted experiments using the MER2023 Challenge dataset and compared our results with previous state-of-the-art supervised methods. The outcomes show that our model, which maps audio and visual features to textual space, achieves the highest F1 score across various modalities. Our results can be replicated using the following steps.
+
+![MER2023](./images/table_03.jpg)
+
 In the [evaluation config file](eval_configs/eval_emotion.yaml#L8), specify the path to [pretrained checkpoint of Emotion-LLaMA](https://drive.google.com/drive/folders/1hD-d1Cu6r3nJBgUYLP30W3SJVpveoins?usp=sharing).  
 ```
 # set pretrained checkpoint path
