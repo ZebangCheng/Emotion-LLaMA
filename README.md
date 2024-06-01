@@ -12,7 +12,7 @@ Extensive evaluations show Emotion-LLaMA outperforms other MLLMs, achieving top 
 
 ## Demo
 ![dome](./images/demo_img01.png)
-![dome](./images/demo_img01.png)
+![dome](./images/demo_img02.png)
 
 ## MERR Dataset
 
