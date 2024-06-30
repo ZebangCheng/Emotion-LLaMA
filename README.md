@@ -83,6 +83,17 @@ Run the following code to evaluate the F1 score on MER2023-SEMI:
 torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset feature_face_caption
 ```
 
+## ✒️ Citation
+If you find our work helpful for your research, please consider giving a star ⭐ and citation 📝
+```bibtex
+@article{cheng2024emotion,
+  title={Emotion-LLaMA: Multimodal Emotion Recognition and Reasoning with Instruction Tuning},
+  author={Cheng, Zebang and Cheng, Zhi-Qi and He, Jun-Yan and Sun, Jingdong and Wang, Kai and Lin, Yuxiang and Lian, Zheng and Peng, Xiaojiang and Hauptmann, Alexander},
+  journal={arXiv preprint arXiv:2406.11161},
+  year={2024}
+}
+```
+
 ## 🙏 Acknowledgements
 
 - [MiniGPT-v2](https://arxiv.org/abs/2310.09478): Large Language Model as a Unified Interface for Vision-Language Multi-task Learning.
