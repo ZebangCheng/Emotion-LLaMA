@@ -13,6 +13,7 @@ Extensive evaluations demonstrate that Emotion-LLaMA outperforms other MLLMs, ac
 Dive in to explore more about our innovative approach and impressive results!
 
 ## 🎬 Demo
+You can experience the powerful emotion recognition capabilities of Emotion-LLaMA through the online demo.
 
 ![Demo Image 1](./images/demo_img01.png)
 ![Demo Image 2](./images/demo_img02.png)
