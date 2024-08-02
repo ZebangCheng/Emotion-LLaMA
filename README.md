@@ -61,6 +61,32 @@ Specify the path to Llama-2 in the [model config file](minigpt4/configs/models/m
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ```
 
+## 💡 Training
+**1. Prepare Multi-modal Encoders**
+To extract rich and comprehensive emotion features, we use the HuBERT model as the Audio Encoder, the EVA model as the Global Encoder, the MAE model as the Local Encoder, and the VideoMAE model as the Temporal Encoder. In practice, to save GPU memory, we do not load all Encoders directly onto the GPU but instead load the extracted features. Please modify the `get()` function in the [dataset file](minigpt4/datasets/datasets/first_face.py#L161) to set the path for reading the features.
+
+**2. Prepare Multi-task Instruction**
+
+First, set the type of tasks in the [dataset file](minigpt4/datasets/datasets/first_face.py#L61):
+```python
+self.task_pool = [
+    "emotion",
+    "reason",
+]
+```
+Here, the "emotion" task represents a multi-modal emotion recognition task, while the "reason" task represents a multi-modal emotion inference task. Different tasks will randomly select different prompts from different instruction pools.
+
+Then, concatenate the Features and Prompt according to the instruction template. The template is defined as follows:
+```markdown
+[INST] < AudioFeature > < VideoFeature > [Task Identifier] Prompt [/INST]
+```
+
+**3. Run**
+Run the following code to pre-train Emotion-LLaMA:  
+```
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc-per-node 4 train.py --cfg-path train_configs/minigptv2_finetune_featureface.yaml
+```
+
 ## 🧪 Evaluation
 
 ### MER2023 Challenge
