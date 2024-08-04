@@ -84,7 +84,7 @@ Then, concatenate the Features and Prompt according to the instruction template.
 
 **3. Run**
 Run the following code to pre-train Emotion-LLaMA:  
-```
+```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc-per-node 4 train.py --cfg-path train_configs/Emotion-LLaMA_finetune.yaml
 ```
 
