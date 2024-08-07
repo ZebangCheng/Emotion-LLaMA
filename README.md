@@ -10,7 +10,7 @@ Additionally, we propose **Emotion-LLaMA**, a model that seamlessly integrates a
 
 Extensive evaluations demonstrate that Emotion-LLaMA outperforms other MLLMs, achieving top scores in Clue Overlap (7.83) and Label Overlap (6.25) on EMER, an F1 score of 0.9036 on the MER2023 challenge, and the highest UAR (45.59) and WAR (59.37) in zero-shot evaluations on the DFEW dataset.
 
-Dive in to explore more about our innovative approach and impressive results!
+More details about Emotion-LLaMA, please refer to this [report](https://arxiv.org/pdf/2406.11161). Feel free to email zebang.cheng@gmail.com if you have any question.
 
 ## 🎬 Demo
 You can experience the powerful emotion recognition capabilities of Emotion-LLaMA through the [online demo](https://huggingface.co/spaces/ZebangCheng/Emotion-LLaMA).
