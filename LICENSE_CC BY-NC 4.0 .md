@@ -1,4 +1,4 @@
-MER2023 Dataset - CC BY-NC 4.0 License
+Attribution 4.0 International
 
 This is a legal agreement between You (the "Licensee") and the MER2023 Dataset  Owner (the "Licensor") governing the use of the MER2023 Dataset (the "Dataset").
 
