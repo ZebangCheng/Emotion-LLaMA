@@ -116,3 +116,7 @@ torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion
 - [MiniGPT-v2](https://arxiv.org/abs/2310.09478): Large Language Model as a Unified Interface for Vision-Language Multi-task Learning.
 - [AffectGPT](https://arxiv.org/abs/2306.15401): Explainable Multimodal Emotion Recognition.
 - [LLaVA](https://llava-vl.github.io/): Large Language-and-Vision Assistant.
+
+
+## 📜 License
+This repository is under the [BSD 3-Clause License](./LICENSE.md). Code is based on MiniGPT-4 with BSD 3-Clause License [here](./LICENSE_MiniGPT4.md). Data is from MER2023 and licensed under [CC BY-NC 4.0](./CC%20BY-NC%204.0%20LICENSE.md) for research purposes only.
