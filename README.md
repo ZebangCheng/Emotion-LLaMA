@@ -119,4 +119,4 @@ torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion
 
 
 ## 📜 License
-This repository is under the [BSD 3-Clause License](./LICENSE.md). Code is based on MiniGPT-4 with BSD 3-Clause License [here](./LICENSE_MiniGPT4.md). Data is from MER2023 and licensed under [CC BY-NC 4.0](./CC%20BY-NC%204.0%20LICENSE.md) for research purposes only.
+This repository is under the [BSD 3-Clause License](./LICENSE.md). Code is based on MiniGPT-4 with BSD 3-Clause License [here](./LICENSE_MiniGPT4.md). Data is from MER2023 and licensed under [CC BY-NC 4.0](./LICENSE_CC%20BY-NC%204.0%20.md) for research purposes only.
