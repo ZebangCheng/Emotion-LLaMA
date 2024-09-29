@@ -1,5 +1,8 @@
 # Emotion-LLaMA: Multimodal Emotion Recognition and Reasoning with Instruction Tuning  
 
+## 📢 News
+
+
 ## 🚀 Overview
 
 Accurate emotion perception is crucial for various applications, including human-computer interaction, education, and counseling. However, traditional single-modality approaches often fail to capture the complexity of real-world emotional expressions, which are inherently multimodal. Moreover, existing Multimodal Large Language Models (MLLMs) face challenges in integrating audio and recognizing subtle facial micro-expressions.
@@ -116,6 +119,18 @@ torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion
 - [MiniGPT-v2](https://arxiv.org/abs/2310.09478): Large Language Model as a Unified Interface for Vision-Language Multi-task Learning.
 - [AffectGPT](https://arxiv.org/abs/2306.15401): Explainable Multimodal Emotion Recognition.
 - [LLaVA](https://llava-vl.github.io/): Large Language-and-Vision Assistant.
+
+
+## ✒️ Citation
+If you find our work helpful for your research, please consider giving a star  and citation 
+```bibtex
+@article{cheng2024emotion,
+  title={Emotion-LLaMA: Multimodal Emotion Recognition and Reasoning with Instruction Tuning},
+  author={Cheng, Zebang and Cheng, Zhi-Qi and He, Jun-Yan and Sun, Jingdong and Wang, Kai and Lin, Yuxiang and Lian, Zheng and Peng, Xiaojiang and Hauptmann, Alexander},
+  journal={arXiv preprint arXiv:2406.11161},
+  year={2024}
+}
+```
 
 
 ## 📜 License
