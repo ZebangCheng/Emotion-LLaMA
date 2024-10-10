@@ -37,7 +37,7 @@ Detailed examples of multimodal emotion recognition and reasoning performed by t
 > https://huggingface.co/TencentGameMate/chinese-hubert-large
 
 
-2.Specify the path to HuBERT-large in the [conversation file](minigpt4\conversation\conversation.py#L263):
+2.Specify the path to HuBERT-large in the [conversation file](minigpt4/conversation/conversation.py#L263):
 
 ```yaml
 # Set HuBERT-large model path
@@ -49,7 +49,7 @@ model_file = "checkpoints/transformer/chinese-hubert-large"
 > https://drive.google.com/file/d/1pNngqXdc3cKr9uLNW-Hu3SKvOpjzfzGY/view?usp=sharing  
 
 
-4.Specify the path to Emotion-LLaMA in the [demo config file](eval_configs\demo.yaml#L10):
+4.Specify the path to Emotion-LLaMA in the [demo config file](eval_configs/demo.yaml#L10):
 
 ```yaml
 # Set Emotion-LLaMA path
