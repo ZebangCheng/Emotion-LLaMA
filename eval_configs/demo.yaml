@@ -7,7 +7,7 @@ model:
   # low_resource: False 
   prompt_template: '[INST] {} [/INST]'
 
-  ckpt: "/home/czb/project/Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth"
+  ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth"
 
   lora_r: 64
   lora_alpha: 16

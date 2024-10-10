@@ -16,10 +16,60 @@ Extensive evaluations demonstrate that Emotion-LLaMA outperforms other MLLMs, ac
 More details about Emotion-LLaMA, please refer to this [report](https://arxiv.org/pdf/2406.11161). Feel free to contact us if you have any question.
 
 ## 🎬 Demo
+
+### Online Demo
 You can experience the powerful emotion recognition capabilities of Emotion-LLaMA through the [online demo](https://huggingface.co/spaces/ZebangCheng/Emotion-LLaMA).
 
-![Demo Image 1](./images/demo_img01.png)
+<!-- ![Demo Image 1](./images/demo_img01.png) -->
 ![Demo Image 2](./images/demo_img02.png)
+
+Detailed examples of general tasks performed by the Emotion-LLaMA.
+
+![Demo Examples Other](./images/demo_examples_other.jpg)  
+
+Detailed examples of multimodal emotion recognition and reasoning performed by the Emotion-LLaMA.
+
+![Demo Examples Task](./images/demo_examples_task.jpg)  
+
+### Local Demo
+1.Download the HuBERT-large model from Huggingface to `Emotion-LLaMA/checkpoints/transformer/`:
+
+> https://huggingface.co/TencentGameMate/chinese-hubert-large
+
+
+2.Specify the path to HuBERT-large in the [conversation file](minigpt4\conversation\conversation.py#L263):
+
+```yaml
+# Set HuBERT-large model path
+model_file = "checkpoints/transformer/chinese-hubert-large"
+```
+
+3.Download the Emotion-LLaMA demo model from Googel Drive to `Emotion-LLaMA/checkpoints/save_checkpoint/`:
+
+> https://drive.google.com/file/d/1pNngqXdc3cKr9uLNW-Hu3SKvOpjzfzGY/view?usp=sharing  
+
+
+4.Specify the path to Emotion-LLaMA in the [demo config file](eval_configs\demo.yaml#L10):
+
+```yaml
+# Set Emotion-LLaMA path
+ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth"
+```
+
+5.Install the required packages:  
+```
+pip install moviepy==1.0.3
+pip install soundfile==0.12.1
+pip install opencv-python==4.7.0.72
+```
+
+6.Launching Demo Locally
+```
+python app.py
+
+# After running the code, click the following link to experience the demo webpage: 
+# Running on local URL: http://127.0.0.1:7860
+```
 
 ## 📊 MERR Dataset
 
@@ -54,9 +104,7 @@ conda activate llama
 
 Download the Llama-2-7b-chat-hf model from Huggingface to `Emotion-LLaMA/checkpoints/`:
 
-```
-https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
-```
+> https://huggingface.co/meta-llama/Llama-2-7b-chat-hf  
 
 Specify the path to Llama-2 in the [model config file](minigpt4/configs/models/minigpt_v2.yaml#L14):
 
