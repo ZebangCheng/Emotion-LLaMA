@@ -1,11 +1,17 @@
 import argparse
+import os
 import time
 from threading import Thread
 from PIL import Image
+import cv2
+from moviepy.editor import VideoFileClip
+import soundfile as sf
+
 
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer
 from transformers import StoppingCriteria, StoppingCriteriaList, TextIteratorStreamer
+from transformers import Wav2Vec2FeatureExtractor
 
 import dataclasses
 from enum import auto, Enum
@@ -136,6 +142,31 @@ CONV_VISION_minigptv2 = Conversation(
     sep="",
 )
 
+
+def get_first_frame(video_path):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print("Error: Cannot open video.")
+        return None
+    ret, frame = cap.read()
+    cap.release()
+
+    if ret:
+        return frame
+    else:
+        print("Error: Cannot read frame from video.")
+        return None
+
+def extract_audio_from_video(video_path):
+    video = VideoFileClip(video_path)
+    audio = video.audio
+    # audio.write_audiofile("audio.wav")
+
+    audio_path = "audio.wav"
+    audio.write_audiofile(audio_path, fps=16000, codec='pcm_s16le', ffmpeg_params=['-ac', '1'])
+    samples, sr = sf.read(audio_path)
+    return samples, sr
+
 class Chat:
     def __init__(self, model, vis_processor, device='cuda:0', stopping_criteria=None):
         self.device = device
@@ -160,7 +191,7 @@ class Chat:
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
         print('prompt:', prompt)
-        print('img_list:', img_list)
+        # print('img_list:', img_list)
         embs = self.model.get_context_emb(prompt, img_list)
 
         current_max_len = embs.shape[1] + max_new_tokens
@@ -215,24 +246,59 @@ class Chat:
     def encode_img(self, img_list):
         image = img_list[0]
         img_list.pop(0)
-        if isinstance(image, str):  # is a image path
-            raw_image = Image.open(image).convert('RGB')
-            image = self.vis_processor(raw_image).unsqueeze(0).to(self.device)
+
+        # # video
+        if isinstance(image, str):  # is a video path
+            print("isinstance str")
+            video_path = image
+            raw_image = get_first_frame(video_path)
+            # cv2.imwrite("fisrt_frame.jpg", raw_image)
+            frame_rgb = cv2.cvtColor(raw_image, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(frame_rgb)
+            image = self.vis_processor(pil_image).unsqueeze(0).to(self.device)
+
+            samples, sr = extract_audio_from_video(video_path)
+            # print("samples:", samples)
+
+            model_file = "checkpoints/transformer/chinese-hubert-large"
+            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_file)
+            input_values = feature_extractor(samples, sampling_rate=sr, return_tensors="pt").input_values
+            # print("input_values:", input_values)
+
+            from transformers import HubertModel
+            hubert_model = HubertModel.from_pretrained(model_file)
+            hubert_model.eval()
+            with torch.no_grad():
+                hidden_states = hubert_model(input_values, output_hidden_states=True).hidden_states # tuple of (B, T, D)
+                # print("hidden_states:", hidden_states)
+                audio_feature = torch.stack(hidden_states)[[-1]].sum(dim=0)  # sum, (B, T, D)
+                audio_feature = audio_feature[0].detach().unsqueeze(0)
+                audio_feature = torch.mean(audio_feature, dim=1, keepdim=True)
+
         elif isinstance(image, Image.Image):
+            print("isinstance Image")
             raw_image = image
             image = self.vis_processor(raw_image).unsqueeze(0).to(self.device)
         elif isinstance(image, torch.Tensor):
+            print("isinstance Tensor")
             if len(image.shape) == 3:
                 image = image.unsqueeze(0)
             image = image.to(self.device)
 
-        image_emb, _ = self.model.encode_img(image)
+        # print("audio_feature:", audio_feature)
+        video_features = torch.zeros([1, 2, 1024])
+        video_features = torch.cat((video_features, audio_feature), dim=1)
+
+        print("audio faature shape:", audio_feature.shape)
+        print("video_features", video_features.shape)
+        image_emb, _ = self.model.encode_img(image, video_features)
         img_list.append(image_emb)
 
     def upload_img(self, image, conv, img_list):
-        conv.append_message(conv.roles[0], "<Img><ImageHere></Img>")
+        # conv.append_message(conv.roles[0], "<Img><ImageHere></Img>")
+        conv.append_message(conv.roles[0], "<video><VideoHere></video> <feature><FeatureHere></feature>")
         img_list.append(image)
         msg = "Received."
 
         return msg
-
+    
