@@ -113,6 +113,51 @@ Specify the path to Llama-2 in the [model config file](minigpt4/configs/models/m
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ```
 
+### Project overview
+
+Emotion-LLaMA is structured as follows:
+
+```
+📦Dataset
+ ┗ 📦Emotion
+    ┗ 📂MER2023
+      ┣ 📂video
+      ┣ 📂HL-UTT 
+      ┣ 📂mae_340_UTT
+      ┣ 📂maeV_399_UTT
+      ┣ 📜transcription_en_all.csv
+      ┣ 📜MERR_coarse_grained.txt
+      ┣ 📜MERR_coarse_grained.json
+      ┣ 📜MERR_fine_grained.txt
+      ┗ 📜MERR_fine_grained.json
+ 📦Emotion-LLaMA
+ ┣ 📂checkpoints
+ ┃ ┣ 📂Llama-2-7b-chat-hf
+ ┃ ┣ 📂save_checkpoint
+ ┃ ┃ ┣ 📂stage2
+ ┃ ┃ ┃ ┣ 📜checkpoint_best.pth
+ ┃ ┃ ┃ ┗ 📜log.txt
+ ┃ ┃ ┗ 📜Emoation_LLaMA.pth
+ ┃ ┣ 📂transformer
+ ┃ ┃ ┗ 📂chinese-hubert-large
+ ┃ ┗ 📜minigptv2_checkpoint.pth
+ ┣ 📂eval_configs 
+ ┃ ┣ 📜demo.yaml
+ ┃ ┣ 📜eval_emotion.yaml
+ ┃ ┗ 📜eval_emotion_EMER.yaml
+ ┣ 📂train_configs
+ ┃ ┣ 📜Emotion-LLaMA_finetune.yaml
+ ┃ ┗ 📜minigptv2_tuning_stage_2.yaml
+ ┣ 📂minigpt4
+ ┣ 📜app.py
+ ┣ 📜environment.yml
+ ┣ 📜eval_emotion.py
+ ┣ 📜eval_emotion_EMER.py
+ ┗ 📜train.py
+
+```
+
+
 ## 💡 Training
 **1. Prepare Multi-modal Encoders**
 To extract rich and comprehensive emotion features, we use the HuBERT model as the Audio Encoder, the EVA model as the Global Encoder, the MAE model as the Local Encoder, and the VideoMAE model as the Temporal Encoder. In practice, to save GPU memory, we do not load all Encoders directly onto the GPU but instead load the extracted features. Please modify the `get()` function in the [dataset file](minigpt4/datasets/datasets/first_face.py#L161) to set the path for reading the features.
