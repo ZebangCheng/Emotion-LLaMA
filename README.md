@@ -94,7 +94,7 @@ The dataset was initially auto-annotated with coarse-grained labels for 28,618 s
 ### Preparing the Code and Environment
 
 ```bash
-git clone https://github.com/ZebangCheng/Emotion-LLaMA.git
+git clone https://github.com/???/Emotion-LLaMA.git
 cd Emotion-LLaMA
 conda env create -f environment.yaml
 conda activate llama
