@@ -71,6 +71,7 @@ Specify the path to MiniGPT-v2 in the [config file](train_configs\Emotion-LLaMA_
 ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/minigptv2_checkpoint.pth"
 ```
 
+You can refer to the path displayed in [Project Overview](./Overview.md) for storing the downloaded file.
 
 ## 🎬 Demo
 
