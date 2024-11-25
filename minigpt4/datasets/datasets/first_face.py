@@ -99,10 +99,23 @@ class FeatureFaceDataset(Dataset):
         t = self.tmp[index]
         video_name = t[0]
 
-        image_file = '{}.jpg'.format(video_name)
-        image_path = os.path.join(self.vis_root, image_file)
-        image = Image.open(image_path).convert("RGB")
+        video_path = os.path.join(self.vis_root, video_name + ".mp4")
+        if os.path.exists(video_path):
+            image = self.extract_frame(video_path)
+        else:
+            video_path = os.path.join(self.vis_root, video_name + ".avi")
+            image = self.extract_frame(video_path)
+
+        image = Image.fromarray(image.astype('uint8'))
+        image = image.convert('RGB')
         image = self.vis_processor(image)
+
+
+        # image_file = '{}.jpg'.format(video_name)
+        # image_path = os.path.join(self.vis_root, image_file)
+        # image = Image.open(image_path).convert("RGB")
+        # image = self.vis_processor(image)
+
 
         FaceMAE_feats, VideoMAE_feats, Audio_feats = self.get(video_name)
         if len(VideoMAE_feats.shape) == 1:
