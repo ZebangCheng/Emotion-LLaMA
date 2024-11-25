@@ -3,8 +3,8 @@ datasets:
     data_type: images
     
     build_info:
-      # image_path: /home/user/selected_face/first_face/images
-      image_path: /home/user/selected_face/first_face/first_frames
+    build_info:
+      image_path: /home/czb/big_space/datasets/Emotion/MER2023/video
 
       ann_path: /home/user/selected_face/face_emotion/relative_train_NCEV.txt
       # ann_path: /home/user/selected_face/face_emotion/all_label_NCEV.txt

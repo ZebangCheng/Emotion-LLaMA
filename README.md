@@ -137,6 +137,13 @@ python app.py
 Due to copyright restrictions, we are unable to provide the raw videos or extracted images. Please visit the official MER2023 website to apply for access to the dataset.
 > http://merchallenge.cn/datasets  
 
+Then specify the path to Dataset in the [dataset config file](minigpt4\configs\datasets\firstface\featureface.yaml#L7):
+
+```yaml
+# Set Dataset video path
+image_path: /home/czb/big_space/datasets/Emotion/MER2023/video
+```
+
 **2. Prepare Multi-modal Encoders**
 To extract rich and comprehensive emotion features, we use the HuBERT model as the Audio Encoder, the EVA model as the Global Encoder, the MAE model as the Local Encoder, and the VideoMAE model as the Temporal Encoder. In practice, to save GPU memory, we do not load all Encoders directly onto the GPU but instead load the extracted features. You can download the processed feature files through the following Google Drive link and save them to the dataset folder.
 
