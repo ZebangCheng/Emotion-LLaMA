@@ -170,6 +170,16 @@ class FeatureFaceDataset(Dataset):
             "image_id": video_name
         }
     
+    def extract_frame(self, video_path):
+        video_capture = cv2.VideoCapture(video_path)
+        success, frame = video_capture.read()
+        if not success:
+            raise ValueError("Failed to read video file:", video_path)
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        video_capture.release()
+
+        return frame_rgb
+
 
     def get(self, video_name):
         # FaceMAE feature
