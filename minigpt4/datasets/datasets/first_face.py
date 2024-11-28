@@ -79,13 +79,13 @@ class FeatureFaceDataset(Dataset):
 
         self.emo2idx, self.idx2emo = {}, {}
         for ii, emo in enumerate(emos): self.emo2idx[emo] = ii
-        for ii, emo in enumerate(emos): self.emo2idx[ii] = emo
+        for ii, emo in enumerate(emos): self.idx2emo[ii] = emo
 
-        json_file_path = "/home/user/selected_face/face_emotion/AU_filter_merge.json"
+        json_file_path = "/home/user/selected_face/face_emotion/AU_filter_merge.json" # MERR_coarse_grained.json
         with open(json_file_path, 'r') as json_file:
             self.AU_filter_json = json.load(json_file)
 
-        reason_json_file_path = "/home/user/selected_face/face_emotion/0512_target_smp_end.json"
+        reason_json_file_path = "/home/user/selected_face/face_emotion/0512_target_smp_end.json" # MERR_fine_grained.json
         with open(reason_json_file_path, 'r') as json_file:
             self.reason_dict = json.load(json_file)
 
