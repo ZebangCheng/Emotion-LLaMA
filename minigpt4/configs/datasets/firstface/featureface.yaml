@@ -6,5 +6,5 @@ datasets:
       image_path: /home/czb/big_space/datasets/Emotion/MER2023/video
 
       ann_path: /home/user/selected_face/face_emotion/relative_train_NCEV.txt
-      # ann_path: /home/user/selected_face/face_emotion/all_label_NCEV.txt
-      # ann_path: /home/user/selected_face/face_emotion/target_label_list_0512_smp.txt
+      # ann_path: /home/user/selected_face/face_emotion/MERR_coarse_grained.txt
+      # ann_path: /home/user/selected_face/face_emotion/MERR_fine_grained.txt

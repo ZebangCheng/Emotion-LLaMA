@@ -81,13 +81,13 @@ class FeatureFaceDataset(Dataset):
         for ii, emo in enumerate(emos): self.emo2idx[emo] = ii
         for ii, emo in enumerate(emos): self.idx2emo[ii] = emo
 
-        json_file_path = "/home/user/selected_face/face_emotion/AU_filter_merge.json" # MERR_coarse_grained.json
+        json_file_path = "/home/user/selected_face/face_emotion/MERR_coarse_grained.json" 
         with open(json_file_path, 'r') as json_file:
-            self.AU_filter_json = json.load(json_file)
+            self.MERR_coarse_grained_json = json.load(json_file)
 
-        reason_json_file_path = "/home/user/selected_face/face_emotion/0512_target_smp_end.json" # MERR_fine_grained.json
+        reason_json_file_path = "/home/user/selected_face/face_emotion/MERR_fine_grained.json"
         with open(reason_json_file_path, 'r') as json_file:
-            self.reason_dict = json.load(json_file)
+            self.MERR_fine_grained_dict = json.load(json_file)
 
         self.character_lines = pd.read_csv('/home/user/selected_face/face_emotion/transcription_en_all.csv')
 
@@ -134,7 +134,7 @@ class FeatureFaceDataset(Dataset):
             caption = self.text_processor(caption)
             instruction_pool = self.emotion_instruction_pool
         elif task == "reason":
-            caption = self.reason_dict[video_name]['smp_reason_caption']
+            caption = self.MERR_fine_grained_dict[video_name]['smp_reason_caption']
             infer_str = " Therefore, it is inferred that his emotional state is: "
             caption = caption + infer_str + t[2]
 
@@ -147,10 +147,10 @@ class FeatureFaceDataset(Dataset):
             infer_str = " Therefore, it is inferred that his emotional state is: "
             caption = t[2]
             instruction_pool = [
-                self.reason_dict[video_name]['reason_caption'] + infer_str,
+                self.MERR_fine_grained_dict[video_name]['reason_caption'] + infer_str,
             ]
         elif task == "caption":
-            caption = self.AU_filter_json[video_name]['caption']
+            caption = self.MERR_coarse_grained_json[video_name]['caption']
             caption = self.text_processor(caption)
             instruction_pool = self.caption_instruction_pool
 
