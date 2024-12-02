@@ -83,7 +83,7 @@ class FeatureFaceDataset(Dataset):
 
         json_file_path = "/home/user/selected_face/face_emotion/MERR_coarse_grained.json" 
         with open(json_file_path, 'r') as json_file:
-            self.MERR_coarse_grained_json = json.load(json_file)
+            self.MERR_coarse_grained_dict = json.load(json_file)
 
         reason_json_file_path = "/home/user/selected_face/face_emotion/MERR_fine_grained.json"
         with open(reason_json_file_path, 'r') as json_file:
@@ -134,25 +134,18 @@ class FeatureFaceDataset(Dataset):
             caption = self.text_processor(caption)
             instruction_pool = self.emotion_instruction_pool
         elif task == "reason":
+            caption = self.MERR_coarse_grained_dict[video_name]['caption']
+
+            caption = self.text_processor(caption)
+            instruction_pool = self.reason_instruction_pool
+
+        elif task == "reason_v2":
             caption = self.MERR_fine_grained_dict[video_name]['smp_reason_caption']
-            infer_str = " Therefore, it is inferred that his emotional state is: "
-            caption = caption + infer_str + t[2]
 
             # caption = "" # for test reasoning
 
             caption = self.text_processor(caption)
             instruction_pool = self.reason_instruction_pool
-
-        elif task == "infer":
-            infer_str = " Therefore, it is inferred that his emotional state is: "
-            caption = t[2]
-            instruction_pool = [
-                self.MERR_fine_grained_dict[video_name]['reason_caption'] + infer_str,
-            ]
-        elif task == "caption":
-            caption = self.MERR_coarse_grained_json[video_name]['caption']
-            caption = self.text_processor(caption)
-            instruction_pool = self.caption_instruction_pool
 
 
         emotion = self.emo2idx[t[2]]
