@@ -1,0 +1,7 @@
+datasets:
+  mer2024_caption:
+    data_type: images
+    
+    build_info:
+      image_path: /home/czb/big_space/datasets/Emotion/MER2024/video-unlabeled-with-test2noise
+      ann_path: /home/czb/big_space/datasets/Emotion/MER2024/MER2024_noise_pseu_label_8348.txt

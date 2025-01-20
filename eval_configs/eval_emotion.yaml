@@ -34,6 +34,12 @@ evaluation_datasets:
     max_new_tokens: 500
     batch_size: 1
 
+  mer2024_caption:
+    eval_file_path: /home/czb/big_space/datasets/Emotion/MER2024/MER2024-noise_NCE.txt # MER2024
+    img_path: /home/czb/big_space/datasets/Emotion/MER2024/video-unlabeled-with-test2noise
+    max_new_tokens: 500
+    batch_size: 1  
+
 run:
   task: image_text_pretrain
   name: minigptv2_evaluation
