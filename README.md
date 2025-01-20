@@ -254,6 +254,19 @@ Emotion-LLaMA similarly achieved state-of-the-art performance, recording an F1 s
 | ILR		      |   0.7833 (13) |
 | ACRG_GL	    |   0.7782 (14) |
 
+Specify the path to the pretrained checkpoint of Emotion-LLaMA in the [evaluation config file](eval_configs/eval_emotion.yaml#L8):
+
+```yaml
+# Set pretrained checkpoint path
+llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
+ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/stage2/MER2024-best.pth"
+```
+
+Run the following code to evaluate the F1 score on MER2024-NOISE:
+
+```bash
+torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset mer2024_caption
+```
 
 ## 🙏 Acknowledgements
 
