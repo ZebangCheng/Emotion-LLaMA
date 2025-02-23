@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 import webdataset as wds
 import cv2
 
-
+    
 
 class MER2024Dataset(Dataset):
     def __init__(self, vis_processor, text_processor, vis_root, ann_path):

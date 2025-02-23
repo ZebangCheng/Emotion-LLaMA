@@ -26,7 +26,7 @@ evaluation_datasets:
   feature_face_caption:
     eval_file_path: /home/user/selected_face/face_emotion/relative_test3_NCEV.txt # MER2023
 
-    img_path: /home/user/selected_face/first_face/first_frames
+    img_path: /home/czb/big_space/datasets/Emotion/MER2023/video
 
     # eval_file_path: /home/user/selected_face/DFEW/reltive_DFEW_set_1_test.txt
     # img_path: /home/user/selected_face/DFEW/images     

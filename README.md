@@ -278,11 +278,34 @@ torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotio
 ## ✒️ Citation
 If you find our work helpful for your research, please consider giving a star  and citation 
 ```bibtex
-@article{cheng2024emotion,
-  title={Emotion-LLaMA: Multimodal Emotion Recognition and Reasoning with Instruction Tuning},
-  author={Cheng, Zebang and Cheng, Zhi-Qi and He, Jun-Yan and Sun, Jingdong and Wang, Kai and Lin, Yuxiang and Lian, Zheng and Peng, Xiaojiang and Hauptmann, Alexander},
-  journal={arXiv preprint arXiv:2406.11161},
-  year={2024}
+@inproceedings{NEURIPS2024_c7f43ada,
+ author = {Cheng, Zebang and Cheng, Zhi-Qi and He, Jun-Yan and Wang, Kai and Lin, Yuxiang and Lian, Zheng and Peng, Xiaojiang and Hauptmann, Alexander},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {A. Globerson and L. Mackey and D. Belgrave and A. Fan and U. Paquet and J. Tomczak and C. Zhang},
+ pages = {110805--110853},
+ publisher = {Curran Associates, Inc.},
+ title = {Emotion-LLaMA: Multimodal Emotion Recognition and Reasoning with Instruction Tuning},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2024/file/c7f43ada17acc234f568dc66da527418-Paper-Conference.pdf},
+ volume = {37},
+ year = {2024}
+}
+
+@inproceedings{10.1145/3689092.3689404,
+ author = {Cheng, Zebang and Tu, Shuyuan and Huang, Dawei and Li, Minghan and Peng, Xiaojiang and Cheng, Zhi-Qi and Hauptmann, Alexander G.},
+ title = {SZTU-CMU at MER2024: Improving Emotion-LLaMA with Conv-Attention for Multimodal Emotion Recognition},
+ year = {2024},
+ isbn = {9798400712036},
+ publisher = {Association for Computing Machinery},
+ address = {New York, NY, USA},
+ url = {https://doi.org/10.1145/3689092.3689404},
+ doi = {10.1145/3689092.3689404},
+ abstract = {This paper presents our winning approach for the MER-NOISE and MER-OV tracks of the MER2024 Challenge on multimodal emotion    recognition. Our system leverages the advanced emotional understanding capabilities of Emotion-LLaMA to generate high-quality annotations for unlabeled samples, addressing the challenge of limited labeled data. To enhance multimodal fusion while mitigating modality-specific noise, we introduce Conv-Attention, a lightweight and efficient hybrid framework. Extensive experimentation validates the effectiveness of our approach. In the MER-NOISE track, our system achieves a state-of-the-art weighted average F-score of 85.30\%, surpassing the second and third-place teams by 1.47\% and 1.65\%, respectively. For the MER-OV track, our utilization of Emotion-LLaMA for open-vocabulary annotation yields an 8.52\% improvement in average accuracy and recall compared to GPT-4V, securing the highest score among all participating large multimodal models. The code and model for Emotion-LLaMA are available at https://github.com/ZebangCheng/Emotion-LLaMA.},
+ booktitle = {Proceedings of the 2nd International Workshop on Multimodal and Responsible Affective Computing},
+ pages = {78–87},
+ numpages = {10},
+ keywords = {mer2024, noise robustness, open-vocabulary recognition},
+ location = {Melbourne VIC, Australia},
+ series = {MRAC '24}
 }
 ```
 
