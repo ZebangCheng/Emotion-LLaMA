@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
 注意，这里FastAPI的端口是7887，不能与gradio的端口为7889冲突。
 
-最好执行以下命令：
+然后执行以下命令：
 ```
 curl -X POST "http://10.14.3.47:7887/process_video" \
      -H "Content-Type: application/json" \
