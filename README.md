@@ -130,6 +130,13 @@ python app.py
 # Running on local URL: http://127.0.0.1:7860
 ```
 
+### Gradio API - Local Inference API
+
+For detailed Gradio API documentation, please refer to:  
+- [📖 English README](./api_en.md)  
+- [📖 中文 README](./api_zh.md)
+
+
 
 ## 💡 Training
 
