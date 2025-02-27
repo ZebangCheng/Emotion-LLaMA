@@ -34,12 +34,12 @@ print(response.json())
 Gradio 的 API 默认在 /api/predict/ 之类的路径上, 在teminal上直接执行
 ```
 # linux：注意不要使用单引号 
-curl -X POST "http://127.0.0.1:7889/api/predict/" \
+curl -X POST "http://your-server-ip:7889/api/predict/" \
      -H "Content-Type: application/json" \
      -d '{"data": ["/home/czb/project/Emotion-LLaMA/examples/sample_00004671.mp4", "The person in video says: Won'\''t you? Impossible! Fan Xiaomei is not such a person. [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?"]}'
 
 # windows：不能换行
-curl -X POST "http://10.14.3.47:7889/api/predict/" -H "Content-Type: application/json" -d "{\"data\": [\"/home/czb/project/Emotion-LLaMA/examples/sample_00004671.mp4\", \"The person in video says: Won't you? Impossible! Fan Xiaomei is not such a person. [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?\"]}"
+curl -X POST "http://your-server-ip:7889/api/predict/" -H "Content-Type: application/json" -d "{\"data\": [\"/home/czb/project/Emotion-LLaMA/examples/sample_00004671.mp4\", \"The person in video says: Won't you? Impossible! Fan Xiaomei is not such a person. [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?\"]}"
 ```
 
 ### 方案3：使用 FastAPI
@@ -53,7 +53,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 
-from app_test import process_video_question
+from app_EmotionLlamaClient import process_video_question
 
 app = FastAPI()
 
@@ -78,7 +78,8 @@ if __name__ == "__main__":
 
 然后执行以下命令：
 ```
-curl -X POST "http://10.14.3.47:7887/process_video" \
+# for linux:
+curl -X POST "http://your-server-ip:7887/process_video" \
      -H "Content-Type: application/json" \
      -d '{
           "video_path": "/home/czb/project/Emotion-LLaMA/examples/sample_00004671.mp4",
@@ -86,5 +87,5 @@ curl -X POST "http://10.14.3.47:7887/process_video" \
      }'
 
 # for windows
-curl -X POST "http://10.14.3.47:7887/process_video" -H "Content-Type: application/json" -d "{\"video_path\": \"/home/czb/project/Emotion-LLaMA/examples/sample_00004671.mp4\", \"question\": \"The person in video says: Won't you? Impossible! Fan Xiaomei is not such a person. [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?\"}"
+curl -X POST "http://your-server-ip:7887/process_video" -H "Content-Type: application/json" -d "{\"video_path\": \"/home/czb/project/Emotion-LLaMA/examples/sample_00004671.mp4\", \"question\": \"The person in video says: Won't you? Impossible! Fan Xiaomei is not such a person. [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?\"}"
 ```
