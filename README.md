@@ -3,7 +3,7 @@
 [<img alt="Open In Colab" class="!m-0" src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/drive/1YTSadgBRfn75wpgpor8_mYWcM6TUPF-i?usp=sharing)
 
 ## 📢 News
-[2025.6.28] 🔥🔥🔥 We release the MERR dataset contruction strategy at [MER-Dataset-Builder](https://github.com/Lum1104/MER-Dataset-Builder)  
+[2025.6.28] 🔥🔥🔥 We release the MERR dataset contruction strategy at [MER-Dataset-Builder](https://github.com/Lum1104/MER-Dataset-Builder). Supporting Huggingface models, Ollama, and Google Gemini API etc.  
 [2024.09.27] 🎉🎉🎉 Our Emotion-LLaMA has been accepted at NIPS 2024!   
 [2024.09.07] 🥉🥉🥉 We achieved third place in the MER-OV track of the MER2024 Challenge. Emotion-LLaMA is the highest-scoring model among all individual models.  
 [2024.07.10] 🏆🏆🏆 Building on Emotion-LLaMA, we won the championship in the MER-Noise track of the MER2024 Challenge.  

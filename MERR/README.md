@@ -1,6 +1,6 @@
 # Multimodal emotion recognition and reasoning  
 
-We release the MERR dataset contruction strategy at [MER-Dataset-Builder](https://github.com/Lum1104/MER-Dataset-Builder)
+We release the MERR dataset contruction strategy at [MER-Dataset-Builder](https://github.com/Lum1104/MER-Dataset-Builder), thanks to @Lum1104.
 
 <details>
 <summary>Try out our MER-Dataset-Builder</summary>
@@ -121,4 +121,4 @@ Through these processes, the final MERR dataset contains 4,487 samples along wit
 - **Image Pipeline**: End-to-end emotion recognition with image description and emotional synthesis
 - **MER Pipeline**: Full end-to-end multimodal emotion recognition with peak frame detection and emotional synthesis
 
-Examples of MERR can be found at [bakllava_llama3.2_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/bakllava_llama3.2_merr.json) and [gemini_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/gemini_merr.json)
+Examples of MERR by different MLLM can be found at [bakllava_llama3.2_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/bakllava_llama3.2_merr.json) and [gemini_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/gemini_merr.json)
