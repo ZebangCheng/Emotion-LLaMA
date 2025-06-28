@@ -1,6 +1,6 @@
 # Multimodal emotion recognition and reasoning  
 
-We release the MERR dataset contruction strategy at [MER-Dataset-Builder](https://github.com/Lum1104/MER-Dataset-Builder), thanks to @Lum1104.
+We release the MERR dataset construction strategy at [MER-Dataset-Builder](https://github.com/Lum1104/MER-Dataset-Builder), thanks to @Lum1104.
 
 <details>
 <summary>Try out our MER-Dataset-Builder</summary>
