@@ -121,4 +121,4 @@ Through these processes, the final MERR dataset contains 4,487 samples along wit
 - **Image Pipeline**: End-to-end emotion recognition with image description and emotional synthesis
 - **MER Pipeline**: Full end-to-end multimodal emotion recognition with peak frame detection and emotional synthesis
 
-Examples of MERR by different MLLM can be found at [bakllava_llama3.2_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/bakllava_llama3.2_merr.json) and [gemini_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/gemini_merr.json)
+Examples of MERR by different MLLM can be found at [llava-llama3:latest_llama3.2_merr_data.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/llava-llama3:latest_llama3.2_merr_data.json) and [gemini_merr.json](https://github.com/Lum1104/MER-Dataset-Builder/blob/main/examples/gemini_merr.json)
