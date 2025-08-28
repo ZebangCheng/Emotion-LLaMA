@@ -160,7 +160,7 @@ To extract rich and comprehensive emotion features, we use the HuBERT model as t
 > https://drive.google.com/drive/folders/1DqGSBgpRo7TuGNqMJo9BYg6smJE20MG4?usp=drive_link
   
 
-Please modify the `get()` function in the [dataset file](minigpt4/datasets/datasets/first_face.py#L161) to set the path for reading the features.
+Please modify the `get()` function in the [dataset file](minigpt4/datasets/datasets/first_face.py#L177) to set the path for reading the features.
 
 The specific feature extraction process can be referenced in the contents of the "feature_extract" folder. Detailed instructions will come soon.
 > https://drive.google.com/drive/folders/1d-Sg5fAskt2s6OOEUNXFaM2u-C055Whj?usp=sharing
