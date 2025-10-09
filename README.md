@@ -278,6 +278,10 @@ Run the following code to evaluate the F1 score on MER2024-NOISE:
 torchrun  --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset mer2024_caption
 ```
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=ZebangCheng/Emotion-LLaMA&type=Date)](https://www.star-history.com/#ZebangCheng/Emotion-LLaMA&Date)
+
 ## 🙏 Acknowledgements
 
 - [MiniGPT-v2](https://arxiv.org/abs/2310.09478): Large Language Model as a Unified Interface for Vision-Language Multi-task Learning.
