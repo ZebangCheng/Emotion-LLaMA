@@ -3,6 +3,7 @@
 [<img alt="Open In Colab" class="!m-0" src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/drive/1YTSadgBRfn75wpgpor8_mYWcM6TUPF-i?usp=sharing)
 
 ## 📢 News
+[2024.10.30] 📚📚📚 We release comprehensive documentation site! Check out our [📖 Documentation](https://zebangcheng.github.io/Emotion-LLaMA/)!  
 [2025.07.09] 🔥🔥🔥 We release the MERR dataset construction strategy at [MER-Factory](https://github.com/Lum1104/MER-Factory)!  
 [2024.09.27] 🎉🎉🎉 Our Emotion-LLaMA has been accepted at NIPS 2024!   
 [2024.09.07] 🥉🥉🥉 We achieved third place in the MER-OV track of the MER2024 Challenge. Emotion-LLaMA is the highest-scoring model among all individual models.  
@@ -22,6 +23,9 @@ Extensive evaluations demonstrate that Emotion-LLaMA outperforms other MLLMs, ac
 
 More details about Emotion-LLaMA, please refer to this [paper](https://arxiv.org/pdf/2406.11161). Feel free to contact us if you have any question.
 
+> [!IMPORTANT]
+> 📚 **[View Full Documentation](https://zebangcheng.github.io/Emotion-LLaMA/)** for comprehensive guides on installation, training, evaluation, and API usage.
+
 ## 📊 MERR Dataset
 
 ### 📈 Comparison of Emotional Datasets
@@ -32,7 +36,7 @@ The MERR dataset extends the range of emotional categories and annotations beyon
 
 ### 📝 Example of the MERR Dataset
 
-The dataset was initially auto-annotated with coarse-grained labels for 28,618 samples from a large pool of unannotated data, and later refined to include 4,487 samples with fine-grained annotations. For more details on the data annotation process, see [MERR Dataset Construction](./MERR/README.md).
+The dataset was initially auto-annotated with coarse-grained labels for 28,618 samples from a large pool of unannotated data, and later refined to include 4,487 samples with fine-grained annotations. For more details on the data annotation process, see [MERR Dataset Construction](https://zebangcheng.github.io/Emotion-LLaMA/dataset/construction.html).
 
 ![Data Example](./images/data-example_sample_00000047_add_peak_00.png)
 
@@ -74,7 +78,7 @@ Specify the path to MiniGPT-v2 in the [config file](train_configs\Emotion-LLaMA_
 ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/minigptv2_checkpoint.pth"
 ```
 
-You can refer to the path displayed in [Project Overview](./Overview.md) for storing the downloaded file.
+For a detailed project structure, see the [Getting Started Guide](https://zebangcheng.github.io/Emotion-LLaMA/getting-started/).
 
 ## 🎬 Demo
 
@@ -136,8 +140,8 @@ python app.py
 ### Gradio API - Local Inference API
 
 For detailed Gradio API documentation, please refer to:  
-- [📖 English README](./api_en.md)  
-- [📖 中文 README](./api_zh.md)
+- [📖 English API Guide](https://zebangcheng.github.io/Emotion-LLaMA/api/en.html)  
+- [📖 中文 API 指南](https://zebangcheng.github.io/Emotion-LLaMA/api/zh.html)
 
 
 
@@ -190,7 +194,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc-per-node 4 train.py --cfg-path tra
 ```
 
 **6. Next Steps**  
-If you would like to experience the instruction-tuning process and see the performance of Emotion-LLaMA on emotion reasoning tests with the EMER dataset, please refer to Stage 2.
+If you would like to experience the instruction-tuning process and see the performance of Emotion-LLaMA on emotion reasoning tests with the EMER dataset, please refer to [Stage 2: Instruction Tuning](https://zebangcheng.github.io/Emotion-LLaMA/training/instruction-tuning.html).
 
 
 ## 🧪 Evaluation
