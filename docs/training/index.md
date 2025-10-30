@@ -138,14 +138,25 @@ model:
   arch: minigpt_v2
   llama_model: "/path/to/checkpoints/Llama-2-7b-chat-hf"
   ckpt: "/path/to/checkpoints/minigptv2_checkpoint.pth"
+  lora_r: 64
+  lora_alpha: 16
+
+datasets:
+  feature_face_caption:
+    batch_size: 1
 
 run:
-  batch_size_train: 8
-  batch_size_eval: 8
-  num_workers: 4
+  lr_sched: "linear_warmup_cosine_lr"
+  init_lr: 1e-5
+  min_lr: 1e-6
+  warmup_lr: 1e-6
+  weight_decay: 0.05
   max_epoch: 30
+  num_workers: 6
+  iters_per_epoch: 1000
   warmup_steps: 1000
-  lr: 1e-5
+  seed: 42
+  amp: True
 ```
 
 ### Training Progress
@@ -171,19 +182,22 @@ For advanced emotion reasoning with fine-grained annotations, see [Instruction T
 
 If you encounter out-of-memory errors:
 
-1. **Reduce batch size**:
+1. **Batch size is already 1** (per GPU)
+   - With 4 GPUs, effective batch size = 4
+
+2. **Mixed precision is enabled by default**:
    ```yaml
-   batch_size_train: 4  # Instead of 8
+   amp: True  # Already enabled
    ```
 
-2. **Enable gradient accumulation**:
+3. **Use gradient checkpointing**:
    ```yaml
-   accum_grad_iters: 2  # Effective batch size = 4 * 2 = 8
+   use_grad_checkpoint: True  # Already enabled
    ```
 
-3. **Use mixed precision**:
+4. **Reduce image size** (if desperate):
    ```yaml
-   use_amp: true
+   image_size: 224  # Instead of 448
    ```
 
 ### Monitor Training
@@ -224,11 +238,13 @@ Key hyperparameters to tune:
 
 | Parameter | Description | Default | Range |
 |:----------|:------------|:-------:|:------|
-| `lr` | Learning rate | 1e-5 | 1e-6 to 1e-4 |
-| `batch_size_train` | Training batch size | 8 | 4 to 16 |
+| `init_lr` | Initial learning rate | 1e-5 | 1e-6 to 1e-4 |
+| `batch_size` | Batch size per GPU | 1 | 1 to 2 |
 | `max_epoch` | Number of epochs | 30 | 20 to 50 |
 | `warmup_steps` | Warmup steps | 1000 | 500 to 2000 |
 | `weight_decay` | Weight decay | 0.05 | 0.01 to 0.1 |
+| `lora_r` | LoRA rank | 64 | 32 to 128 |
+| `lora_alpha` | LoRA alpha | 16 | 8 to 32 |
 
 ---
 

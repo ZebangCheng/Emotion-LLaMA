@@ -129,26 +129,29 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc-per-node 4 train.py --cfg-path tra
 model:
   arch: minigpt_v2
   llama_model: "/path/to/checkpoints/Llama-2-7b-chat-hf"
-  ckpt: "/path/to/stage1/checkpoint_29.pth"
-  freeze_vit: true
-  freeze_qformer: true
+  ckpt: "/path/to/stage1/checkpoint_29.pth"  # Use Stage 1 checkpoint
+  use_grad_checkpoint: True
+  chat_template: True
+  lora_r: 64
+  lora_alpha: 16
+
+datasets:
+  feature_face_caption:
+    batch_size: 1
 
 run:
   task: image_text_pretrain
-  lr: 1e-5
-  batch_size_train: 4      # Smaller batch for detailed reasoning
-  batch_size_eval: 4
-  num_workers: 4
+  lr_sched: "linear_warmup_cosine_lr"
+  init_lr: 1e-6      # Lower learning rate for fine-tuning
+  min_lr: 1e-6
+  warmup_lr: 1e-6
+  weight_decay: 0.05
   max_epoch: 30
-  warmup_steps: 500
+  num_workers: 6
   iters_per_epoch: 1000
-  
-  # Evaluation settings
-  evaluate: true
-  eval_epoch_interval: 5
-  
-  # Checkpoint settings
-  save_epoch_interval: 5
+  warmup_steps: 1000
+  seed: 42
+  amp: True
 ```
 
 ### Training Progress
@@ -191,16 +194,20 @@ indicating strong happiness and excitement."
 
 ### 1. Learning Rate
 
-Start with a lower learning rate than Stage 1:
+Use a **lower** learning rate than Stage 1:
 ```yaml
-lr: 1e-5  # or even 5e-6 for very stable training
+# Stage 1: init_lr: 1e-5
+# Stage 2: init_lr: 1e-6  (10x smaller!)
 ```
+
+This prevents catastrophic forgetting of Stage 1 knowledge.
 
 ### 2. Batch Size
 
-Use smaller batches for better reasoning:
+Batch size remains 1 per GPU:
 ```yaml
-batch_size_train: 4  # Instead of 8
+batch_size: 1  # Same as Stage 1
+# With 4 GPUs, effective batch size = 4
 ```
 
 ### 3. Data Augmentation
