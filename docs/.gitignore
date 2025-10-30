@@ -1,0 +1,38 @@
+# Jekyll build outputs
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+
+# Bundler
+.bundle/
+vendor/
+
+# Gemfile.lock - keep for production, but can ignore for docs
+# Uncomment the next line if you want to ignore it
+# Gemfile.lock
+
+# Ruby version managers
+.ruby-version
+.ruby-gemset
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
