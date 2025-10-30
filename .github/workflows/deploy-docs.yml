@@ -37,7 +37,7 @@ jobs:
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.1'
+          ruby-version: '3.2'
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
           cache-version: 0 # increment to invalidate cache
           working-directory: '${{ github.workspace }}/docs'
