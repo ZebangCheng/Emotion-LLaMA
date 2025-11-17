@@ -3,7 +3,7 @@
 [<img alt="Open In Colab" class="!m-0" src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/drive/1YTSadgBRfn75wpgpor8_mYWcM6TUPF-i?usp=sharing)
 
 ## 📢 News
-[2024.10.30] 📚📚📚 We release comprehensive documentation site! Check out our [📖 Documentation](https://zebangcheng.github.io/Emotion-LLaMA/)!  
+[2025.10.30] 📚📚📚 We release comprehensive documentation site! Check out our [📖 Documentation](https://zebangcheng.github.io/Emotion-LLaMA/)!  
 [2025.07.09] 🔥🔥🔥 We release the MERR dataset construction strategy at [MER-Factory](https://github.com/Lum1104/MER-Factory)!  
 [2024.09.27] 🎉🎉🎉 Our Emotion-LLaMA has been accepted at NIPS 2024!   
 [2024.09.07] 🥉🥉🥉 We achieved third place in the MER-OV track of the MER2024 Challenge. Emotion-LLaMA is the highest-scoring model among all individual models.  
