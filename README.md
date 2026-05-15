@@ -71,7 +71,7 @@ Specify the path to Llama-2 in the [model config file](minigpt4/configs/models/m
 llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
 ```
 
-Specify the path to MiniGPT-v2 in the [config file](train_configs\Emotion-LLaMA_finetune.yaml#L9):
+Specify the path to MiniGPT-v2 in the [config file](train_configs/Emotion-LLaMA_finetune.yaml):
 
 ```yaml
 # Set MiniGPT-v2 path
