@@ -418,7 +418,7 @@ def image_upload_trigger(upload_flag, replace_flag, img_list):
     return upload_flag, replace_flag
 
 
-def example_trigger(text_input, image, upload_flag, replace_flag, img_list):
+def example_trigger(image, text_input, upload_flag, replace_flag, img_list):
     # set the upload flag to true when receive a new image.
     # if there is an old image (and old conversation), set the replace flag to true to reset the conv later.
     upload_flag = 1
@@ -632,25 +632,26 @@ with gr.Blocks() as demo:
 
     with gr.Row():
         with gr.Column():
+            # Keep live session state out of example data and update it after loading.
             gr.Examples(examples=[
-                ["examples/samplenew_00004251.mp4", "[detection] face", upload_flag, replace_flag, img_list],
-                ["examples/sample_00000338.mp4", "The person in video says: Oh no, my phone and wallet are all in my bag. [emotion] Please determine which emotion label in the video represents: happy, sad, neutral, angry, worried, surprise.", upload_flag, replace_flag, img_list],
-                ["examples/sample_00000669.mp4", "The person in video says: Why are you looking at me like this? It's just a woman, so you have to have something to do with me.  [emotion] Determine the emotional state shown in the video, choosing from happy, sad, neutral, angry, worried, or surprise.", upload_flag, replace_flag, img_list],
-                ["examples/sample_00003462.mp4", "The person in video says: Do you believe that you push me around?  [emotion] Assess and label the emotion evident in the video: could it be happy, sad, neutral, angry, worried, surprise?", upload_flag, replace_flag, img_list],
-                ["examples/sample_00000727.mp4", "The person in video says: No, this, I have to get up! You, I'm sorry, everyone. I'm sorry, it's from the German side.  [emotion] Identify the displayed emotion in the video: is it happy, sad, neutral, angry, worried, or surprise?", upload_flag, replace_flag, img_list],
-                ["examples/samplenew_00061200.mp4", "The person in video says: I'm not going in anymore, scared.  [emotion] Identify the displayed emotion in the video: is it happy, sad, neutral, angry, fear, contempt, doubt, worried, or surprise?", upload_flag, replace_flag, img_list],
+                ["examples/samplenew_00004251.mp4", "[detection] face", None, None, None],
+                ["examples/sample_00000338.mp4", "The person in video says: Oh no, my phone and wallet are all in my bag. [emotion] Please determine which emotion label in the video represents: happy, sad, neutral, angry, worried, surprise.", None, None, None],
+                ["examples/sample_00000669.mp4", "The person in video says: Why are you looking at me like this? It's just a woman, so you have to have something to do with me.  [emotion] Determine the emotional state shown in the video, choosing from happy, sad, neutral, angry, worried, or surprise.", None, None, None],
+                ["examples/sample_00003462.mp4", "The person in video says: Do you believe that you push me around?  [emotion] Assess and label the emotion evident in the video: could it be happy, sad, neutral, angry, worried, surprise?", None, None, None],
+                ["examples/sample_00000727.mp4", "The person in video says: No, this, I have to get up! You, I'm sorry, everyone. I'm sorry, it's from the German side.  [emotion] Identify the displayed emotion in the video: is it happy, sad, neutral, angry, worried, or surprise?", None, None, None],
+                ["examples/samplenew_00061200.mp4", "The person in video says: I'm not going in anymore, scared.  [emotion] Identify the displayed emotion in the video: is it happy, sad, neutral, angry, fear, contempt, doubt, worried, or surprise?", None, None, None],
             ], inputs=[image, text_input, upload_flag, replace_flag, img_list], fn=example_trigger,
-                outputs=[upload_flag, replace_flag])
+                outputs=[upload_flag, replace_flag], run_on_click=True)
         with gr.Column():
             gr.Examples(examples=[
-                ["examples/samplenew_00051251.mp4", "In what state is the person in the video, say the following: \"Do you really think so?\"", upload_flag, replace_flag, img_list],
-                ["examples/sample_00004735.mp4", "[visual] What are the emotions of the woman in the video?", upload_flag, replace_flag, img_list],
-                ["examples/sample_00002422.mp4", "[audio] Analyze the speaker's voice in the video.", upload_flag, replace_flag, img_list],
-                ["examples/sample_00001073.mp4", "The person in video says: Make him different from before. I like the way you are now.  [reason] Please analyze all the clues in the video and reason out the emotional label of the person in the video.", upload_flag, replace_flag, img_list],
-                ["examples/sample_00004671.mp4", "The person in video says: Won't you? Impossible! Fan Xiaomei is not such a person.  [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?", upload_flag, replace_flag, img_list],
-                ["examples/sample_00005854.mp4", "The person in video says: Bastard! Boss, you don't choose, you prefer.  [reason] Please integrate information from various modalities to infer the emotional category of the person in the video.", upload_flag, replace_flag, img_list],
+                ["examples/samplenew_00051251.mp4", "In what state is the person in the video, say the following: \"Do you really think so?\"", None, None, None],
+                ["examples/sample_00004735.mp4", "[visual] What are the emotions of the woman in the video?", None, None, None],
+                ["examples/sample_00002422.mp4", "[audio] Analyze the speaker's voice in the video.", None, None, None],
+                ["examples/sample_00001073.mp4", "The person in video says: Make him different from before. I like the way you are now.  [reason] Please analyze all the clues in the video and reason out the emotional label of the person in the video.", None, None, None],
+                ["examples/sample_00004671.mp4", "The person in video says: Won't you? Impossible! Fan Xiaomei is not such a person.  [reason] What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?", None, None, None],
+                ["examples/sample_00005854.mp4", "The person in video says: Bastard! Boss, you don't choose, you prefer.  [reason] Please integrate information from various modalities to infer the emotional category of the person in the video.", None, None, None],
             ], inputs=[image, text_input, upload_flag, replace_flag, img_list], fn=example_trigger,
-                outputs=[upload_flag, replace_flag])
+                outputs=[upload_flag, replace_flag], run_on_click=True)
 
     dataset.click(
         gradio_taskselect,
