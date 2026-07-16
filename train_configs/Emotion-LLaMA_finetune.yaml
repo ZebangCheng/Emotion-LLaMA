@@ -17,6 +17,8 @@ model:
 datasets:    
   feature_face_caption: 
     batch_size: 1
+    task_pool: [emotion, reason]
+    annotation_format: auto
     vis_processor:
       train:
         name: "blip2_image_train"
@@ -25,6 +27,14 @@ datasets:
       train:
         name: "blip_caption"
     sample_ratio: 30
+    build_info:
+      image_path: /path/to/MER2023/video
+      ann_path: /path/to/MER2023/MERR_coarse_grained.txt
+      transcription_path: transcription_en_all.csv
+      coarse_grained_json_path: MERR_coarse_grained.json
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
 
 run:
   task: image_text_pretrain

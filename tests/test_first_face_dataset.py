@@ -9,6 +9,7 @@ import types
 import unittest
 
 import numpy as np
+import yaml
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -582,30 +583,80 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
                     )
                 )
 
-    def test_shipped_configs_expose_task_transcript_and_feature_resources(self):
-        default_yaml = (
-            REPOSITORY_ROOT
-            / "minigpt4"
-            / "configs"
-            / "datasets"
-            / "firstface"
-            / "featureface.yaml"
-        ).read_text(encoding="utf-8")
-        self.assertIn("task_pool:", default_yaml)
-        self.assertIn("annotation_format:", default_yaml)
+    def test_shipped_configs_expose_dataset_behavior(self):
+        def load_config(relative_path):
+            return yaml.safe_load(
+                (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+            )
 
-        for relative_path in (
-            "eval_configs/eval_emotion.yaml",
-            "eval_configs/eval_emotion_EMER.yaml",
-        ):
+        path_keys = {
+            "transcription_path",
+            "face_feature_path",
+            "video_feature_path",
+            "audio_feature_path",
+        }
+        default_dataset = load_config(
+            "minigpt4/configs/datasets/firstface/featureface.yaml"
+        )["datasets"]["feature_face_caption"]
+        self.assertEqual(default_dataset["task_pool"], ["emotion"])
+        self.assertEqual(default_dataset["annotation_format"], "auto")
+        self.assertTrue(
+            path_keys
+            | {"image_path", "ann_path", "coarse_grained_json_path"}
+            <= set(default_dataset["build_info"])
+        )
+
+        training_configs = (
+            (
+                "train_configs/Emotion-LLaMA_finetune.yaml",
+                ["emotion", "reason"],
+                "coarse_grained_json_path",
+            ),
+            (
+                "train_configs/minigptv2_tuning_stage_2.yaml",
+                ["reason_v2"],
+                "fine_grained_json_path",
+            ),
+        )
+        for relative_path, task_pool, reasoning_path_key in training_configs:
             with self.subTest(relative_path=relative_path):
-                source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
-                self.assertIn("task_pool:", source)
-                self.assertIn("annotation_format:", source)
-                self.assertIn("transcription_path:", source)
-                self.assertIn("face_feature_path:", source)
-                self.assertIn("video_feature_path:", source)
-                self.assertIn("audio_feature_path:", source)
+                dataset = load_config(relative_path)["datasets"][
+                    "feature_face_caption"
+                ]
+                self.assertEqual(dataset["task_pool"], task_pool)
+                self.assertEqual(dataset["annotation_format"], "auto")
+                self.assertNotIn("task_pool", dataset["build_info"])
+                self.assertNotIn("annotation_format", dataset["build_info"])
+                self.assertTrue(
+                    path_keys | {"image_path", "ann_path", reasoning_path_key}
+                    <= set(dataset["build_info"])
+                )
+
+        evaluation_configs = (
+            ("eval_configs/eval_emotion.yaml", ["emotion"], None),
+            (
+                "eval_configs/eval_emotion_EMER.yaml",
+                ["reason_v2"],
+                "fine_grained_json_path",
+            ),
+        )
+        for relative_path, task_pool, reasoning_path_key in evaluation_configs:
+            with self.subTest(relative_path=relative_path):
+                dataset = load_config(relative_path)["evaluation_datasets"][
+                    "feature_face_caption"
+                ]
+                self.assertEqual(dataset["task_pool"], task_pool)
+                self.assertEqual(dataset["annotation_format"], "auto")
+                self.assertTrue(
+                    path_keys | {"eval_file_path", "img_path"} <= set(dataset)
+                )
+                self.assertNotIn("build_info", dataset)
+                if reasoning_path_key is not None:
+                    self.assertIn(reasoning_path_key, dataset)
+                    self.assertTrue(
+                        dataset["eval_file_path"].endswith("MERR_fine_grained.txt")
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

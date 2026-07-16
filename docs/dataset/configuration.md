@@ -28,7 +28,7 @@ evaluation run.
 - Changing the nine-label emotion vocabulary or model checkpoints.
 - Fixing the legacy bitsandbytes Windows 8-bit loading path.
 
-## Training configuration
+## Stage 1 training
 
 Filesystem values live under `build_info`. Dataset behavior lives beside the
 processor and batching options.
@@ -45,7 +45,6 @@ datasets:
       ann_path: /path/to/MER2023/MERR_coarse_grained.txt
       transcription_path: transcription_en_all.csv
       coarse_grained_json_path: MERR_coarse_grained.json
-      fine_grained_json_path: MERR_fine_grained.json
       face_feature_path: mae_340_UTT
       video_feature_path: maeV_399_UTT
       audio_feature_path: HL-UTT
@@ -58,10 +57,60 @@ to be moved by changing only `ann_path` and `image_path`.
 The builder forwards these values explicitly to `FeatureFaceDataset`; it does
 not pass the complete OmegaConf object into the dataset.
 
+Stage 1 uses `task_pool: [emotion, reason]`. The `reason` task reads the
+`caption` field from `coarse_grained_json_path`; the fine-grained JSON is not
+needed for this task pool.
+
 For backward compatibility, the shipped default YAML keeps its existing
 `image_path` and `ann_path` values. It adds the behavioral keys and relative
 resource names shown above, so users can override every dataset location from a
 training config without changing Python source.
+
+## Stage 2 reasoning
+
+Stage 2 switches both the annotation text and reasoning JSON in YAML:
+
+```yaml
+datasets:
+  feature_face_caption:
+    task_pool: [reason_v2]
+    annotation_format: auto
+    build_info:
+      image_path: /path/to/MER2023/video
+      ann_path: /path/to/MER2023/MERR_fine_grained.txt
+      transcription_path: transcription_en_all.csv
+      fine_grained_json_path: MERR_fine_grained.json
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
+```
+
+`reason_v2` reads `smp_reason_caption` from `fine_grained_json_path`; it does
+not load the coarse-grained JSON unless `reason` is also in the task pool.
+
+## Emotion-only custom data
+
+Prepared custom data can run emotion recognition without either reasoning
+JSON:
+
+```yaml
+datasets:
+  feature_face_caption:
+    task_pool: [emotion]
+    annotation_format: auto
+    build_info:
+      image_path: /path/to/custom/videos
+      ann_path: /path/to/custom/annotations.txt
+      transcription_path: transcripts.csv  # optional, but recommended
+      face_feature_path: face_features
+      video_feature_path: video_features
+      audio_feature_path: audio_features
+```
+
+The FaceMAE, VideoMAE, and HuBERT feature directories must each contain a
+`<video_name>.npy` file for every annotation row. These features must be
+prepared before training or evaluation; this configuration change does not add
+online feature extraction or MER-Factory conversion.
 
 ## Evaluation configuration
 
@@ -102,9 +151,9 @@ FeatureFaceDataset(
     transcription_path=None,
     coarse_grained_json_path=None,
     fine_grained_json_path=None,
-    face_feature_path=None,
-    video_feature_path=None,
-    audio_feature_path=None,
+    face_feature_path="mae_340_UTT",
+    video_feature_path="maeV_399_UTT",
+    audio_feature_path="HL-UTT",
 )
 ```
 
@@ -163,6 +212,13 @@ sample_00000023 35 angry -1.174107
 In `auto` mode, a two-column row uses columns 0 and 1. A row with three or more
 columns uses columns 0 and 2. `annotation_format: ne` and
 `annotation_format: ncev` enforce one format and reject incompatible rows.
+
+The field letters mean:
+
+- `N`: video name without the `.mp4` or `.avi` extension;
+- `C`: frame count retained for legacy annotations;
+- `E`: one of the supported emotion labels;
+- `V`: optional trailing valence value.
 
 The parsed emotion must remain one of the existing nine labels:
 `neutral`, `angry`, `happy`, `sad`, `worried`, `surprise`, `fear`, `contempt`,
