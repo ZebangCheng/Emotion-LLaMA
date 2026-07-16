@@ -1,6 +1,7 @@
 datasets:
   feature_face_caption:
     data_type: images
+    task_pool: [emotion]
     
     build_info:
       image_path: /home/czb/big_space/datasets/Emotion/MER2023/video

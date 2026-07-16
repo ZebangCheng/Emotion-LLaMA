@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 import json
 import os
 import random
@@ -18,6 +19,7 @@ FEATURE_FACE_PATH_KEYS = (
     "video_feature_path",
     "audio_feature_path",
 )
+SUPPORTED_TASKS = ("emotion", "reason", "reason_v2")
 
 
 def _resolve_dataset_path(path, base_dir):
@@ -32,11 +34,42 @@ def _resolve_dataset_path(path, base_dir):
 def feature_face_dataset_kwargs(dataset_config, path_config=None):
     path_config = dataset_config if path_config is None else path_config
     kwargs = {}
+    task_pool = dataset_config.get("task_pool", None)
+    if task_pool is not None:
+        kwargs["task_pool"] = task_pool
     for key in FEATURE_FACE_PATH_KEYS:
         value = path_config.get(key, None)
         if value is not None:
             kwargs[key] = value
     return kwargs
+
+
+def _validate_task_pool(task_pool):
+    if task_pool is None:
+        return ["emotion"]
+    error_message = (
+        "Invalid task_pool {!r}; expected a non-empty list or tuple containing "
+        "only supported tasks: {}"
+    ).format(task_pool, ", ".join(SUPPORTED_TASKS))
+    if (
+        isinstance(task_pool, str)
+        or not isinstance(task_pool, Sequence)
+        or not task_pool
+    ):
+        raise ValueError(error_message)
+    invalid = [task for task in task_pool if task not in SUPPORTED_TASKS]
+    if invalid:
+        raise ValueError(error_message)
+    return list(task_pool)
+
+
+def _get_transcript_sentence(character_lines, video_name):
+    sentences = character_lines.loc[
+        character_lines['name'] == video_name, 'sentence'
+    ]
+    if sentences.empty:
+        raise KeyError("No transcript sentence found for sample {!r}".format(video_name))
+    return sentences.iloc[0]
 
 
 class FeatureFaceDataset(Dataset):
@@ -47,9 +80,10 @@ class FeatureFaceDataset(Dataset):
         vis_root,
         ann_path,
         *,
-        transcription_path="transcription_en_all.csv",
-        coarse_grained_json_path="MERR_coarse_grained.json",
-        fine_grained_json_path="MERR_fine_grained.json",
+        task_pool=None,
+        transcription_path=None,
+        coarse_grained_json_path=None,
+        fine_grained_json_path=None,
         face_feature_path="mae_340_UTT",
         video_feature_path="maeV_399_UTT",
         audio_feature_path="HL-UTT",
@@ -59,6 +93,7 @@ class FeatureFaceDataset(Dataset):
 
         self.vis_processor = vis_processor
         self.text_processor = text_processor
+        self.task_pool = _validate_task_pool(task_pool)
 
         self.caption_instruction_pool = [
             "Please describe the details of the expression and tone the video.",
@@ -85,16 +120,6 @@ class FeatureFaceDataset(Dataset):
             "What are the facial expressions and vocal tone used in the video? What is the intended meaning behind his words? Which emotion does this reflect?",
             "Please integrate information from various modalities to infer the emotional category of the person in the video.",
             "Could you describe the emotion-related features of the individual in the video? What emotional category do they fall into?",
-        ]
-
-        # self.task_pool = [
-        #    "emotion",
-        #    "reason",
-        #    "infer",
-        # ]
-
-        self.task_pool = [
-           "emotion",
         ]
 
         print("ann_path: ", ann_path)
@@ -127,13 +152,38 @@ class FeatureFaceDataset(Dataset):
         for ii, emo in enumerate(emos): self.emo2idx[emo] = ii
         for ii, emo in enumerate(emos): self.idx2emo[ii] = emo
 
-        with open(coarse_grained_json_path, 'r') as json_file:
-            self.MERR_coarse_grained_dict = json.load(json_file)
+        self.MERR_coarse_grained_dict = None
+        self.MERR_fine_grained_dict = None
+        if "reason" in self.task_pool:
+            if coarse_grained_json_path is None:
+                raise ValueError(
+                    "coarse_grained_json_path is required when task 'reason' is enabled"
+                )
+            with open(coarse_grained_json_path, 'r') as json_file:
+                self.MERR_coarse_grained_dict = json.load(json_file)
 
-        with open(fine_grained_json_path, 'r') as json_file:
-            self.MERR_fine_grained_dict = json.load(json_file)
+        if "reason_v2" in self.task_pool:
+            if fine_grained_json_path is None:
+                raise ValueError(
+                    "fine_grained_json_path is required when task 'reason_v2' is enabled"
+                )
+            with open(fine_grained_json_path, 'r') as json_file:
+                self.MERR_fine_grained_dict = json.load(json_file)
 
-        self.character_lines = pd.read_csv(transcription_path)
+        self.character_lines = None
+        if transcription_path is not None:
+            character_lines = pd.read_csv(transcription_path)
+            required_columns = ("name", "sentence")
+            missing_columns = [
+                column for column in required_columns if column not in character_lines.columns
+            ]
+            if missing_columns:
+                raise ValueError(
+                    "transcription_path is missing required column(s): {}".format(
+                        ", ".join(missing_columns)
+                    )
+                )
+            self.character_lines = character_lines
 
 
     def __len__(self):
@@ -193,8 +243,10 @@ class FeatureFaceDataset(Dataset):
 
 
         emotion = self.emo2idx[t[2]]
-        sentence = self.character_lines.loc[self.character_lines['name'] == video_name, 'sentence'].values[0]
-        character_line = "The person in video says: {}. ".format(sentence)
+        character_line = ""
+        if self.character_lines is not None:
+            sentence = _get_transcript_sentence(self.character_lines, video_name)
+            character_line = "The person in video says: {}. ".format(sentence)
         
         instruction = "<video><VideoHere></video> <feature><FeatureHere></feature> {} [{}] {} ".format(character_line, task, random.choice(instruction_pool))
 

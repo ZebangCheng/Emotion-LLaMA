@@ -1,3 +1,5 @@
+import ast
+from collections.abc import Sequence
 import importlib.util
 import os
 from pathlib import Path
@@ -15,10 +17,39 @@ DATASET_MODULE_PATH = (
 )
 
 
+class StubVideoCapture:
+    def __init__(self, video_path):
+        self.video_path = video_path
+
+    def read(self):
+        return True, np.zeros((2, 2, 3), dtype=np.uint8)
+
+    def release(self):
+        pass
+
+
+class ConfigSequence(Sequence):
+    def __init__(self, values):
+        self.values = list(values)
+
+    def __getitem__(self, index):
+        return self.values[index]
+
+    def __len__(self):
+        return len(self.values)
+
+
+def identity(value):
+    return value
+
+
 def load_dataset_module():
     cv2_was_present = "cv2" in sys.modules
     original_cv2 = sys.modules.get("cv2")
     cv2_stub = types.ModuleType("cv2")
+    cv2_stub.COLOR_BGR2RGB = 0
+    cv2_stub.VideoCapture = StubVideoCapture
+    cv2_stub.cvtColor = lambda frame, conversion: frame
     sys.modules["cv2"] = cv2_stub
 
     try:
@@ -69,8 +100,12 @@ class FeatureFaceDatasetTest(unittest.TestCase):
 
         self.ann_path = os.path.join(self.root, "annotations.txt")
         Path(self.ann_path).write_text("sample ignored neutral\n", encoding="utf-8")
-        Path(self.root, "coarse.json").write_text("{}", encoding="utf-8")
-        Path(self.root, "fine.json").write_text("{}", encoding="utf-8")
+        Path(self.root, "coarse.json").write_text(
+            '{"sample": {"caption": "coarse"}}', encoding="utf-8"
+        )
+        Path(self.root, "fine.json").write_text(
+            '{"sample": {"smp_reason_caption": "fine"}}', encoding="utf-8"
+        )
         Path(self.root, "transcript.csv").write_text(
             "name,sentence\nsample,hello\n", encoding="utf-8"
         )
@@ -81,9 +116,11 @@ class FeatureFaceDatasetTest(unittest.TestCase):
             np.save(feature_root / "sample.npy", np.array([[value]]))
 
     def make_dataset(self, **kwargs):
+        vis_processor = kwargs.pop("vis_processor", None)
+        text_processor = kwargs.pop("text_processor", None)
         return self.dataset_cls(
-            None,
-            None,
+            vis_processor,
+            text_processor,
             self.root,
             self.ann_path,
             **kwargs,
@@ -106,6 +143,18 @@ class FeatureFaceDatasetTest(unittest.TestCase):
         self.assertEqual(dataset.video_feature_path, os.path.join(self.root, "video"))
         self.assertEqual(dataset.audio_feature_path, os.path.join(self.root, "audio"))
 
+    def test_path_resolution_accepts_absolute_and_pathlike_values(self):
+        absolute_path = Path(self.root, "face")
+
+        self.assertEqual(
+            self.dataset_module._resolve_dataset_path(absolute_path, self.root),
+            os.path.normpath(os.fspath(absolute_path)),
+        )
+        self.assertEqual(
+            self.dataset_module._resolve_dataset_path(Path("face"), self.root),
+            os.path.normpath(os.path.join(self.root, "face")),
+        )
+
     def test_get_uses_configured_feature_roots_in_model_order(self):
         dataset = self.make_dataset(**self.dataset_path_kwargs())
 
@@ -114,6 +163,350 @@ class FeatureFaceDatasetTest(unittest.TestCase):
         np.testing.assert_array_equal(face.numpy(), [[1.0]])
         np.testing.assert_array_equal(video.numpy(), [[2.0]])
         np.testing.assert_array_equal(audio.numpy(), [[3.0]])
+
+    def test_emotion_only_does_not_open_reasoning_json_or_transcript(self):
+        dataset = self.make_dataset(
+            task_pool=["emotion"],
+            coarse_grained_json_path="missing-coarse.json",
+            fine_grained_json_path="missing-fine.json",
+            transcription_path=None,
+        )
+
+        self.assertEqual(dataset.task_pool, ["emotion"])
+        self.assertIsNone(dataset.MERR_coarse_grained_dict)
+        self.assertIsNone(dataset.MERR_fine_grained_dict)
+        self.assertIsNone(dataset.character_lines)
+
+    def test_reason_requires_only_coarse_json(self):
+        dataset = self.make_dataset(
+            task_pool=["reason"],
+            coarse_grained_json_path="coarse.json",
+            fine_grained_json_path="missing-fine.json",
+            transcription_path=None,
+        )
+
+        self.assertEqual(
+            dataset.MERR_coarse_grained_dict["sample"]["caption"], "coarse"
+        )
+        self.assertIsNone(dataset.MERR_fine_grained_dict)
+
+    def test_reason_v2_requires_only_fine_json(self):
+        dataset = self.make_dataset(
+            task_pool=["reason_v2"],
+            coarse_grained_json_path="missing-coarse.json",
+            fine_grained_json_path="fine.json",
+            transcription_path=None,
+        )
+
+        self.assertIsNone(dataset.MERR_coarse_grained_dict)
+        self.assertEqual(
+            dataset.MERR_fine_grained_dict["sample"]["smp_reason_caption"],
+            "fine",
+        )
+
+    def test_mixed_tasks_load_both_reasoning_files(self):
+        dataset = self.make_dataset(
+            task_pool=["reason", "emotion", "reason_v2"],
+            coarse_grained_json_path="coarse.json",
+            fine_grained_json_path="fine.json",
+            transcription_path=None,
+        )
+
+        self.assertEqual(dataset.task_pool, ["reason", "emotion", "reason_v2"])
+        self.assertEqual(
+            dataset.MERR_coarse_grained_dict["sample"]["caption"], "coarse"
+        )
+        self.assertEqual(
+            dataset.MERR_fine_grained_dict["sample"]["smp_reason_caption"],
+            "fine",
+        )
+
+    def test_task_order_and_duplicates_are_preserved_in_a_copy(self):
+        task_pool = ["reason_v2", "emotion", "reason_v2"]
+
+        dataset = self.make_dataset(
+            task_pool=task_pool,
+            coarse_grained_json_path="missing-coarse.json",
+            fine_grained_json_path="fine.json",
+            transcription_path=None,
+        )
+
+        self.assertEqual(dataset.task_pool, task_pool)
+        self.assertIsNot(dataset.task_pool, task_pool)
+
+    def test_invalid_task_pools_report_the_complete_contract(self):
+        for value in ([], (), "emotion", 7, ["unknown"]):
+            with self.subTest(value=value), self.assertRaises(ValueError) as context:
+                self.make_dataset(task_pool=value, transcription_path=None)
+
+            message = str(context.exception)
+            self.assertIn(repr(value), message)
+            self.assertIn("non-empty list or tuple", message)
+            for supported_task in ("emotion", "reason", "reason_v2"):
+                self.assertIn(supported_task, message)
+
+    def test_enabled_reasoning_task_requires_its_configured_json_path(self):
+        cases = (
+            (["reason"], "coarse_grained_json_path"),
+            (["reason_v2"], "fine_grained_json_path"),
+        )
+        for task_pool, required_path in cases:
+            with self.subTest(task_pool=task_pool), self.assertRaisesRegex(
+                ValueError, required_path
+            ):
+                self.make_dataset(
+                    task_pool=task_pool,
+                    coarse_grained_json_path=(
+                        None
+                        if required_path == "coarse_grained_json_path"
+                        else "coarse.json"
+                    ),
+                    fine_grained_json_path=(
+                        None
+                        if required_path == "fine_grained_json_path"
+                        else "fine.json"
+                    ),
+                    transcription_path=None,
+                )
+
+    def test_helper_does_not_hide_missing_reasoning_paths(self):
+        cases = (
+            (["reason"], "coarse_grained_json_path"),
+            (["reason_v2"], "fine_grained_json_path"),
+        )
+        for task_pool, required_path in cases:
+            dataset_kwargs = self.dataset_module.feature_face_dataset_kwargs(
+                {"task_pool": task_pool}, {}
+            )
+            with self.subTest(task_pool=task_pool), self.assertRaisesRegex(
+                ValueError, required_path
+            ):
+                self.make_dataset(**dataset_kwargs)
+
+    def test_optional_transcript_omits_spoken_text_prefix(self):
+        dataset = self.make_dataset(
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            coarse_grained_json_path="missing-coarse.json",
+            fine_grained_json_path="missing-fine.json",
+            transcription_path=None,
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+        )
+
+        sample = dataset[0]
+
+        self.assertNotIn("The person in video says:", sample["instruction_input"])
+        self.assertIn("<video><VideoHere></video>", sample["instruction_input"])
+        self.assertIn("<feature><FeatureHere></feature>", sample["instruction_input"])
+        self.assertIn("[emotion]", sample["instruction_input"])
+        self.assertEqual(
+            set(sample),
+            {
+                "image",
+                "video_features",
+                "instruction_input",
+                "answer",
+                "emotion",
+                "image_id",
+            },
+        )
+
+    def test_transcript_requires_name_and_sentence_columns(self):
+        invalid_transcripts = {
+            "missing-name.csv": "speaker,sentence\nsample,hello\n",
+            "missing-sentence.csv": "name,text\nsample,hello\n",
+        }
+        for filename, contents in invalid_transcripts.items():
+            Path(self.root, filename).write_text(contents, encoding="utf-8")
+            missing_column = "name" if "missing-name" in filename else "sentence"
+            with self.subTest(filename=filename), self.assertRaisesRegex(
+                ValueError, missing_column
+            ):
+                self.make_dataset(
+                    task_pool=["emotion"],
+                    transcription_path=filename,
+                    coarse_grained_json_path="missing-coarse.json",
+                    fine_grained_json_path="missing-fine.json",
+                )
+
+    def test_transcript_requires_a_row_for_the_current_sample(self):
+        Path(self.root, "other-transcript.csv").write_text(
+            "name,sentence\nother,hello\n", encoding="utf-8"
+        )
+        dataset = self.make_dataset(
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            transcription_path="other-transcript.csv",
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+        )
+
+        with self.assertRaisesRegex(KeyError, "sample"):
+            dataset[0]
+
+    def test_helper_preserves_invalid_task_pool_for_focused_validation(self):
+        for task_pool in ("emotion", 7):
+            with self.subTest(task_pool=task_pool), self.assertRaisesRegex(
+                ValueError, "Invalid task_pool"
+            ):
+                dataset_kwargs = self.dataset_module.feature_face_dataset_kwargs(
+                    {"task_pool": task_pool}, {}
+                )
+                self.make_dataset(**dataset_kwargs)
+
+    def test_helper_preserves_config_sequence_until_constructor_validation(self):
+        task_pool = ConfigSequence(["emotion"])
+
+        dataset_kwargs = self.dataset_module.feature_face_dataset_kwargs(
+            {"task_pool": task_pool}, {}
+        )
+        self.assertIs(dataset_kwargs["task_pool"], task_pool)
+
+        dataset = self.make_dataset(**dataset_kwargs)
+        self.assertEqual(dataset.task_pool, ["emotion"])
+
+    def test_dataset_kwargs_forward_task_pool_from_behavioral_config(self):
+        task_pool = ["reason_v2", "emotion"]
+
+        kwargs = self.dataset_module.feature_face_dataset_kwargs(
+            {"task_pool": task_pool},
+            {"face_feature_path": "face"},
+        )
+
+        self.assertEqual(kwargs["task_pool"], task_pool)
+        self.assertEqual(kwargs["face_feature_path"], "face")
+
+    def test_dataset_kwargs_forward_exact_behavior_and_path_contract(self):
+        task_pool = ["emotion", "reason"]
+        behavioral_config = {
+            "task_pool": task_pool,
+            "annotation_format": "auto",
+            "ignored_behavior": "not-forwarded",
+        }
+        path_config = {
+            key: Path("configured", key) for key in self.dataset_module.FEATURE_FACE_PATH_KEYS
+        }
+        path_config["ignored_path"] = "not-forwarded"
+
+        kwargs = self.dataset_module.feature_face_dataset_kwargs(
+            behavioral_config,
+            path_config,
+        )
+
+        self.assertEqual(
+            set(kwargs),
+            {"task_pool", "annotation_format", *self.dataset_module.FEATURE_FACE_PATH_KEYS},
+        )
+        self.assertIs(kwargs["task_pool"], task_pool)
+        self.assertEqual(kwargs["annotation_format"], "auto")
+        for key in self.dataset_module.FEATURE_FACE_PATH_KEYS:
+            self.assertIs(kwargs[key], path_config[key])
+
+
+class FeatureFaceConfigForwardingTest(unittest.TestCase):
+    def test_builder_forwards_shared_dataset_kwargs_to_dataset_constructor(self):
+        source = (
+            REPOSITORY_ROOT
+            / "minigpt4"
+            / "datasets"
+            / "builders"
+            / "image_text_pair_builder.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+
+        helper_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "feature_face_dataset_kwargs"
+        ]
+        self.assertTrue(
+            any(
+                len(call.args) == 2
+                and isinstance(call.args[0], ast.Attribute)
+                and isinstance(call.args[0].value, ast.Name)
+                and call.args[0].value.id == "self"
+                and call.args[0].attr == "config"
+                and isinstance(call.args[1], ast.Name)
+                and call.args[1].id == "build_info"
+                for call in helper_calls
+            )
+        )
+
+        dataset_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "dataset_cls"
+        ]
+        self.assertTrue(
+            any(
+                keyword.arg is None
+                and isinstance(keyword.value, ast.Name)
+                and keyword.value.id == "dataset_kwargs"
+                for call in dataset_calls
+                for keyword in call.keywords
+            )
+        )
+
+    def test_evaluation_scripts_use_shared_dataset_config_forwarder(self):
+        for relative_path in ("eval_emotion.py", "eval_emotion_EMER.py"):
+            with self.subTest(relative_path=relative_path):
+                source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+                tree = ast.parse(source)
+                helper_calls = [
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "feature_face_dataset_kwargs"
+                ]
+                dataset_calls = [
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "FeatureFaceDataset"
+                ]
+
+                self.assertTrue(helper_calls)
+                self.assertTrue(
+                    any(
+                        keyword.arg is None
+                        for call in dataset_calls
+                        for keyword in call.keywords
+                    )
+                )
+
+    def test_shipped_configs_expose_task_transcript_and_feature_resources(self):
+        default_yaml = (
+            REPOSITORY_ROOT
+            / "minigpt4"
+            / "configs"
+            / "datasets"
+            / "firstface"
+            / "featureface.yaml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("task_pool:", default_yaml)
+
+        for relative_path in (
+            "eval_configs/eval_emotion.yaml",
+            "eval_configs/eval_emotion_EMER.yaml",
+        ):
+            with self.subTest(relative_path=relative_path):
+                source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
+                self.assertIn("task_pool:", source)
+                self.assertIn("transcription_path:", source)
+                self.assertIn("face_feature_path:", source)
+                self.assertIn("video_feature_path:", source)
+                self.assertIn("audio_feature_path:", source)
 
 if __name__ == "__main__":
     unittest.main()
