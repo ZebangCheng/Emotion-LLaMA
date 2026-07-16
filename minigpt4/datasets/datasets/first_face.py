@@ -1,30 +1,59 @@
-import glob
+import json
 import os
-import json
-import pickle
 import random
-import time
-import itertools
-import pandas as pd
-import json
 
-import torch.nn.functional as F
-
+import cv2
 import numpy as np
+import pandas as pd
 from PIL import Image
-import skimage.io as io
-import matplotlib.pyplot as plt
-from matplotlib.collections import PatchCollection
-from matplotlib.patches import Polygon, Rectangle
 import torch
 from torch.utils.data import Dataset
-import webdataset as wds
-import cv2
 
-from minigpt4.datasets.datasets.base_dataset import BaseDataset
+
+FEATURE_FACE_PATH_KEYS = (
+    "transcription_path",
+    "coarse_grained_json_path",
+    "fine_grained_json_path",
+    "face_feature_path",
+    "video_feature_path",
+    "audio_feature_path",
+)
+
+
+def _resolve_dataset_path(path, base_dir):
+    if path is None:
+        return None
+    path = os.fspath(path)
+    if not os.path.isabs(path):
+        path = os.path.join(base_dir, path)
+    return os.path.normpath(path)
+
+
+def feature_face_dataset_kwargs(dataset_config, path_config=None):
+    path_config = dataset_config if path_config is None else path_config
+    kwargs = {}
+    for key in FEATURE_FACE_PATH_KEYS:
+        value = path_config.get(key, None)
+        if value is not None:
+            kwargs[key] = value
+    return kwargs
+
 
 class FeatureFaceDataset(Dataset):
-    def __init__(self, vis_processor, text_processor, vis_root, ann_path):
+    def __init__(
+        self,
+        vis_processor,
+        text_processor,
+        vis_root,
+        ann_path,
+        *,
+        transcription_path="transcription_en_all.csv",
+        coarse_grained_json_path="MERR_coarse_grained.json",
+        fine_grained_json_path="MERR_fine_grained.json",
+        face_feature_path="mae_340_UTT",
+        video_feature_path="maeV_399_UTT",
+        audio_feature_path="HL-UTT",
+    ):
 
         self.vis_root = vis_root
 
@@ -70,8 +99,25 @@ class FeatureFaceDataset(Dataset):
 
         print("ann_path: ", ann_path)
         self.ann_path = ann_path
-        self.file_path = os.path.dirname(ann_path)
-        self.tmp = [x.strip().split(' ') for x in open(ann_path)]
+        self.file_path = os.path.dirname(os.path.abspath(ann_path))
+        transcription_path = _resolve_dataset_path(transcription_path, self.file_path)
+        coarse_grained_json_path = _resolve_dataset_path(
+            coarse_grained_json_path, self.file_path
+        )
+        fine_grained_json_path = _resolve_dataset_path(
+            fine_grained_json_path, self.file_path
+        )
+        self.face_feature_path = _resolve_dataset_path(
+            face_feature_path, self.file_path
+        )
+        self.video_feature_path = _resolve_dataset_path(
+            video_feature_path, self.file_path
+        )
+        self.audio_feature_path = _resolve_dataset_path(
+            audio_feature_path, self.file_path
+        )
+        with open(ann_path) as annotation_file:
+            self.tmp = [x.strip().split(' ') for x in annotation_file]
         print(('video number:%d' % (len(self.tmp))))
 
         # emos = ['neutral', 'angry', 'happy', 'sad', 'worried', 'surprise']
@@ -81,15 +127,13 @@ class FeatureFaceDataset(Dataset):
         for ii, emo in enumerate(emos): self.emo2idx[emo] = ii
         for ii, emo in enumerate(emos): self.idx2emo[ii] = emo
 
-        json_file_path = "/home/user/selected_face/face_emotion/MERR_coarse_grained.json" 
-        with open(json_file_path, 'r') as json_file:
+        with open(coarse_grained_json_path, 'r') as json_file:
             self.MERR_coarse_grained_dict = json.load(json_file)
 
-        reason_json_file_path = "/home/user/selected_face/face_emotion/MERR_fine_grained.json"
-        with open(reason_json_file_path, 'r') as json_file:
+        with open(fine_grained_json_path, 'r') as json_file:
             self.MERR_fine_grained_dict = json.load(json_file)
 
-        self.character_lines = pd.read_csv('/home/user/selected_face/face_emotion/transcription_en_all.csv')
+        self.character_lines = pd.read_csv(transcription_path)
 
 
     def __len__(self):
@@ -176,15 +220,15 @@ class FeatureFaceDataset(Dataset):
 
     def get(self, video_name):
         # FaceMAE feature
-        FaceMAE_feats_path = os.path.join(self.file_path, 'mae_340_UTT', video_name + '.npy')
+        FaceMAE_feats_path = os.path.join(self.face_feature_path, video_name + '.npy')
         FaceMAE_feats = torch.tensor(np.load(FaceMAE_feats_path))
 
         # VideoMAE feature
-        VideoMAE_feats_path = os.path.join(self.file_path, 'maeV_399_UTT', video_name + '.npy')
+        VideoMAE_feats_path = os.path.join(self.video_feature_path, video_name + '.npy')
         VideoMAE_feats = torch.tensor(np.load(VideoMAE_feats_path))
 
         # Audio feature
-        Audio_feats_path = os.path.join(self.file_path, 'HL-UTT', video_name + '.npy')
+        Audio_feats_path = os.path.join(self.audio_feature_path, video_name + '.npy')
         Audio_feats = torch.tensor(np.load(Audio_feats_path))
 
         return FaceMAE_feats, VideoMAE_feats, Audio_feats

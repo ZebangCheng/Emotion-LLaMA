@@ -5,7 +5,10 @@ import warnings
 from minigpt4.common.registry import registry
 from minigpt4.datasets.builders.base_dataset_builder import BaseDatasetBuilder
 
-from minigpt4.datasets.datasets.first_face import FeatureFaceDataset
+from minigpt4.datasets.datasets.first_face import (
+    FeatureFaceDataset,
+    feature_face_dataset_kwargs,
+)
 from minigpt4.datasets.datasets.mer2024 import MER2024Dataset
 
 
@@ -33,14 +36,16 @@ class FirstfaceCaptionBuilder(BaseDatasetBuilder):
         # create datasets
         # [NOTE] return inner_datasets (wds.DataPipeline)
         dataset_cls = self.train_dataset_cls
+        dataset_kwargs = feature_face_dataset_kwargs(self.config, build_info)
         datasets[split] = dataset_cls(
             vis_processor=self.vis_processors[split],
             text_processor=self.text_processors[split],
             ann_path=build_info.ann_path,
             vis_root=build_info.image_path,
+            **dataset_kwargs,
         )
 
-        return datasets 
+        return datasets
     
 # MER2024Dataset
 @registry.register_builder("mer2024_caption")
@@ -73,4 +78,4 @@ class MER2024nBuilder(BaseDatasetBuilder):
             vis_root=build_info.image_path,
         )
 
-        return datasets  
+        return datasets
