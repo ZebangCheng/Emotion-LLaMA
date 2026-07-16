@@ -118,6 +118,9 @@ class FeatureFaceDatasetTest(unittest.TestCase):
     def make_dataset(self, **kwargs):
         vis_processor = kwargs.pop("vis_processor", None)
         text_processor = kwargs.pop("text_processor", None)
+        annotation_text = kwargs.pop("annotation_text", None)
+        if annotation_text is not None:
+            Path(self.ann_path).write_text(annotation_text, encoding="utf-8")
         return self.dataset_cls(
             vis_processor,
             text_processor,
@@ -154,6 +157,92 @@ class FeatureFaceDatasetTest(unittest.TestCase):
             self.dataset_module._resolve_dataset_path(Path("face"), self.root),
             os.path.normpath(os.path.join(self.root, "face")),
         )
+
+    def test_auto_accepts_compact_ne_and_legacy_ncev(self):
+        compact = self.make_dataset(annotation_text="sample angry\n")
+        legacy = self.make_dataset(annotation_text="sample 35 angry -1.0\n")
+        extended_legacy = self.make_dataset(
+            annotation_text="sample 35 angry -1.0 retained\n"
+        )
+
+        self.assertEqual(compact.samples[0], ("sample", "angry"))
+        self.assertEqual(legacy.samples[0], ("sample", "angry"))
+        self.assertEqual(extended_legacy.samples[0], ("sample", "angry"))
+
+    def test_explicit_formats_accept_matching_rows(self):
+        cases = (
+            ("sample angry\n", "ne"),
+            ("sample 35 angry\n", "ncev"),
+            ("sample 35 angry -1.0\n", "ncev"),
+        )
+        for annotation_text, annotation_format in cases:
+            with self.subTest(annotation_format=annotation_format):
+                dataset = self.make_dataset(
+                    annotation_text=annotation_text,
+                    annotation_format=annotation_format,
+                )
+                self.assertEqual(dataset.samples, [("sample", "angry")])
+
+    def test_explicit_formats_reject_incompatible_rows(self):
+        cases = (
+            ("sample angry\n", "ncev", "Invalid NCEV annotation at line 1"),
+            (
+                "sample 35 angry -1.0 extra\n",
+                "ncev",
+                "Invalid NCEV annotation at line 1",
+            ),
+            ("sample 35 angry -1.0\n", "ne", "Invalid NE annotation at line 1"),
+        )
+        for annotation_text, annotation_format, message in cases:
+            with self.subTest(
+                annotation_format=annotation_format
+            ), self.assertRaisesRegex(ValueError, message):
+                self.make_dataset(
+                    annotation_text=annotation_text,
+                    annotation_format=annotation_format,
+                )
+
+    def test_blank_lines_are_ignored_and_repeated_whitespace_is_supported(self):
+        dataset = self.make_dataset(
+            annotation_text="\n  sample\t\tangry   \n   \n",
+        )
+
+        self.assertEqual(dataset.samples, [("sample", "angry")])
+
+    def test_unknown_annotation_format_is_rejected(self):
+        for annotation_text in ("sample angry\n", "\n   \n"):
+            with self.subTest(annotation_text=annotation_text), self.assertRaisesRegex(
+                ValueError, "annotation_format must be one of"
+            ):
+                self.make_dataset(
+                    annotation_text=annotation_text,
+                    annotation_format="compact",
+                )
+
+    def test_malformed_annotation_rows_include_line_number(self):
+        with self.assertRaisesRegex(ValueError, "Invalid NCEV annotation at line 2"):
+            self.make_dataset(annotation_text="\nsample\n")
+
+    def test_unknown_emotion_is_rejected_during_initialization(self):
+        with self.assertRaisesRegex(ValueError, "Unknown emotion.*ecstatic.*line 1"):
+            self.make_dataset(annotation_text="sample ecstatic\n")
+
+    def test_compact_annotation_drives_emotion_item(self):
+        dataset = self.make_dataset(
+            annotation_text="sample angry\n",
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            transcription_path=None,
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+        )
+
+        sample = dataset[0]
+
+        self.assertEqual(sample["answer"], "angry")
+        self.assertEqual(sample["emotion"], dataset.emo2idx["angry"])
 
     def test_get_uses_configured_feature_roots_in_model_order(self):
         dataset = self.make_dataset(**self.dataset_path_kwargs())
@@ -407,6 +496,14 @@ class FeatureFaceDatasetTest(unittest.TestCase):
         for key in self.dataset_module.FEATURE_FACE_PATH_KEYS:
             self.assertIs(kwargs[key], path_config[key])
 
+    def test_dataset_kwargs_forward_annotation_format(self):
+        kwargs = self.dataset_module.feature_face_dataset_kwargs(
+            {"annotation_format": "ne"},
+            {},
+        )
+
+        self.assertEqual(kwargs["annotation_format"], "ne")
+
 
 class FeatureFaceConfigForwardingTest(unittest.TestCase):
     def test_builder_forwards_shared_dataset_kwargs_to_dataset_constructor(self):
@@ -495,6 +592,7 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
             / "featureface.yaml"
         ).read_text(encoding="utf-8")
         self.assertIn("task_pool:", default_yaml)
+        self.assertIn("annotation_format:", default_yaml)
 
         for relative_path in (
             "eval_configs/eval_emotion.yaml",
@@ -503,6 +601,7 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
             with self.subTest(relative_path=relative_path):
                 source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
                 self.assertIn("task_pool:", source)
+                self.assertIn("annotation_format:", source)
                 self.assertIn("transcription_path:", source)
                 self.assertIn("face_feature_path:", source)
                 self.assertIn("video_feature_path:", source)

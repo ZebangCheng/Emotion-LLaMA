@@ -20,6 +20,7 @@ FEATURE_FACE_PATH_KEYS = (
     "audio_feature_path",
 )
 SUPPORTED_TASKS = ("emotion", "reason", "reason_v2")
+ANNOTATION_FORMATS = ("auto", "ne", "ncev")
 
 
 def _resolve_dataset_path(path, base_dir):
@@ -37,6 +38,9 @@ def feature_face_dataset_kwargs(dataset_config, path_config=None):
     task_pool = dataset_config.get("task_pool", None)
     if task_pool is not None:
         kwargs["task_pool"] = task_pool
+    annotation_format = dataset_config.get("annotation_format", None)
+    if annotation_format is not None:
+        kwargs["annotation_format"] = annotation_format
     for key in FEATURE_FACE_PATH_KEYS:
         value = path_config.get(key, None)
         if value is not None:
@@ -72,6 +76,29 @@ def _get_transcript_sentence(character_lines, video_name):
     return sentences.iloc[0]
 
 
+def _validate_annotation_format(annotation_format):
+    if annotation_format not in ANNOTATION_FORMATS:
+        raise ValueError(
+            "annotation_format must be one of {}".format(ANNOTATION_FORMATS)
+        )
+
+
+def _parse_annotation_line(line, line_number, annotation_format):
+    _validate_annotation_format(annotation_format)
+    fields = line.split()
+    if annotation_format == "ne" or (
+        annotation_format == "auto" and len(fields) == 2
+    ):
+        if len(fields) != 2:
+            raise ValueError("Invalid NE annotation at line {}".format(line_number))
+        return fields[0], fields[1]
+    if annotation_format == "ncev" and len(fields) not in (3, 4):
+        raise ValueError("Invalid NCEV annotation at line {}".format(line_number))
+    if annotation_format == "auto" and len(fields) < 3:
+        raise ValueError("Invalid NCEV annotation at line {}".format(line_number))
+    return fields[0], fields[2]
+
+
 class FeatureFaceDataset(Dataset):
     def __init__(
         self,
@@ -80,6 +107,7 @@ class FeatureFaceDataset(Dataset):
         vis_root,
         ann_path,
         *,
+        annotation_format="auto",
         task_pool=None,
         transcription_path=None,
         coarse_grained_json_path=None,
@@ -94,6 +122,8 @@ class FeatureFaceDataset(Dataset):
         self.vis_processor = vis_processor
         self.text_processor = text_processor
         self.task_pool = _validate_task_pool(task_pool)
+        _validate_annotation_format(annotation_format)
+        self.annotation_format = annotation_format
 
         self.caption_instruction_pool = [
             "Please describe the details of the expression and tone the video.",
@@ -141,16 +171,29 @@ class FeatureFaceDataset(Dataset):
         self.audio_feature_path = _resolve_dataset_path(
             audio_feature_path, self.file_path
         )
-        with open(ann_path) as annotation_file:
-            self.tmp = [x.strip().split(' ') for x in annotation_file]
-        print(('video number:%d' % (len(self.tmp))))
-
         # emos = ['neutral', 'angry', 'happy', 'sad', 'worried', 'surprise']
         emos = ['neutral', 'angry', 'happy', 'sad', 'worried', 'surprise', 'fear', 'contempt', 'doubt']
 
         self.emo2idx, self.idx2emo = {}, {}
         for ii, emo in enumerate(emos): self.emo2idx[emo] = ii
         for ii, emo in enumerate(emos): self.idx2emo[ii] = emo
+
+        self.samples = []
+        with open(ann_path, encoding="utf-8") as annotation_file:
+            for line_number, line in enumerate(annotation_file, start=1):
+                if not line.strip():
+                    continue
+                video_name, emotion = _parse_annotation_line(
+                    line, line_number, annotation_format
+                )
+                if emotion not in self.emo2idx:
+                    raise ValueError(
+                        "Unknown emotion label {!r} at line {}".format(
+                            emotion, line_number
+                        )
+                    )
+                self.samples.append((video_name, emotion))
+        print(('video number:%d' % (len(self.samples))))
 
         self.MERR_coarse_grained_dict = None
         self.MERR_fine_grained_dict = None
@@ -187,11 +230,10 @@ class FeatureFaceDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.tmp)
+        return len(self.samples)
 
     def __getitem__(self, index):
-        t = self.tmp[index]
-        video_name = t[0]
+        video_name, emotion_label = self.samples[index]
 
         video_path = os.path.join(self.vis_root, video_name + ".mp4")
         if os.path.exists(video_path):
@@ -224,7 +266,7 @@ class FeatureFaceDataset(Dataset):
         # random task
         task = random.choice(self.task_pool)
         if task == "emotion":
-            caption = t[2] # llama2 putput only emotion class
+            caption = emotion_label  # llama2 putput only emotion class
             caption = self.text_processor(caption)
             instruction_pool = self.emotion_instruction_pool
         elif task == "reason":
@@ -242,7 +284,7 @@ class FeatureFaceDataset(Dataset):
             instruction_pool = self.reason_instruction_pool
 
 
-        emotion = self.emo2idx[t[2]]
+        emotion = self.emo2idx[emotion_label]
         character_line = ""
         if self.character_lines is not None:
             sentence = _get_transcript_sentence(self.character_lines, video_name)
