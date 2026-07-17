@@ -180,6 +180,9 @@ class BaseTask:
         """
         use_amp = scaler is not None
 
+        if accum_grad_iters < 1:
+            raise ValueError("accum_grad_iters must be at least 1")
+
         if not hasattr(data_loader, "__next__"):
             # convert to iterator if not already
             data_loader = iter(data_loader)
@@ -205,6 +208,7 @@ class BaseTask:
 
         image_list = []
         caption_list = []
+        optimizer.zero_grad()
         for i in metric_logger.log_every(range(iters_per_epoch), log_freq, header):
             # if using iter-based runner, we stop after iters_per_epoch iterations.
             if i >= iters_per_epoch:
@@ -228,14 +232,18 @@ class BaseTask:
             with torch.cuda.amp.autocast(enabled=use_amp):
                 loss = self.train_step(model=model, samples=samples)
 
+            window_start = (i // accum_grad_iters) * accum_grad_iters
+            window_size = min(accum_grad_iters, iters_per_epoch - window_start)
+            loss_for_backward = loss / window_size
+
             # after_train_step()
             if use_amp:
-                scaler.scale(loss).backward()
+                scaler.scale(loss_for_backward).backward()
             else:
-                loss.backward()
+                loss_for_backward.backward()
 
-            # update gradients every accum_grad_iters iterations
-            if (i + 1) % accum_grad_iters == 0:
+            # Update after a full accumulation window or the final partial window.
+            if (i + 1) % accum_grad_iters == 0 or i + 1 == iters_per_epoch:
                 if use_amp:
                     scaler.step(optimizer)
                     scaler.update()                     
@@ -254,16 +262,18 @@ class BaseTask:
                     print("Attention LR:", param_group["lr"])
 
         # save random samples' name
-        save_dir = "/home/user/project/Emotion-LLaMA/checkpoints/run_samples"
-        save_to = os.path.join(
-            save_dir,
-            "epoch_{}.txt".format(epoch),
-        )
-        with open(save_to, 'w') as file:
-            for i in range(len(image_list)):
-                name = image_list[i]
-                caption = caption_list[i]
-                file.write(name[0] + " " + caption[0] + '\n')
+        if is_main_process():
+            save_dir = os.path.join(registry.get_path("output_dir"), "run_samples")
+            os.makedirs(save_dir, exist_ok=True)
+            save_to = os.path.join(
+                save_dir,
+                "epoch_{}.txt".format(epoch),
+            )
+            with open(save_to, "w", encoding="utf-8") as file:
+                for i in range(len(image_list)):
+                    name = image_list[i]
+                    caption = caption_list[i]
+                    file.write(name[0] + " " + caption[0] + "\n")
 
         # after train_epoch()
         # gather the stats from all processes
