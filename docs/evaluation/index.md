@@ -116,13 +116,27 @@ llama_model: "/path/to/checkpoints/Llama-2-7b-chat-hf"
 ckpt: "/path/to/save_checkpoint/stage2/checkpoint_best.pth"
 ```
 
-**Step 2**: Configure for testing (in `minigpt4/datasets/datasets/first_face.py`):
+**Step 2**: Configure the FeatureFace evaluation block in
+`eval_configs/eval_emotion_EMER.yaml`:
 
-```python
-# Disable caption during testing
-# caption = self.fine_grained_dict[video_name]['smp_reason_caption']
-caption = ""  # for test reasoning
+```yaml
+evaluation_datasets:
+  feature_face_caption:
+    eval_file_path: /path/to/MER2023/MERR_fine_grained.txt
+    img_path: /path/to/MER2023/video
+    task_pool: [reason_v2]
+    annotation_format: auto
+    transcription_path: transcription_en_all.csv
+    fine_grained_json_path: MERR_fine_grained.json
+    face_feature_path: mae_340_UTT
+    video_feature_path: maeV_399_UTT
+    audio_feature_path: HL-UTT
 ```
+
+Relative resource paths are resolved from the annotation directory. The
+transcript is optional but recommended; the three precomputed feature trees
+are required. Evaluation does not extract features online or require a dataset
+source edit.
 
 **Step 3**: Run evaluation:
 
@@ -238,35 +252,51 @@ torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion
 
 ### Evaluate on Your Own Data
 
-**Step 1**: Prepare your dataset in the same format:
+**Step 1**: Prepare a whitespace-delimited annotation file. Use either compact
+`N E` rows or legacy `N C E [V]` rows:
 
+```text
+# Compact: name emotion
+sample_001 happy
+sample_002 sad
+
+# Legacy: name frame_count emotion [valence]
+sample_003 2 angry -0.8
 ```
-video_name, emotion_label, transcription
-sample_001.mp4, happiness, "I'm so happy today!"
-sample_002.mp4, sadness, "This is really disappointing."
-```
+
+Names omit the video extension and must match the `.npy` filenames in each
+feature tree. If available, put transcripts in a separate CSV with `name` and
+`sentence` columns. Transcripts are optional but recommended.
 
 **Step 2**: Create a dataset configuration:
 
+Copy `eval_configs/eval_emotion.yaml`, then replace its FeatureFace evaluation
+block with the implemented keys:
+
 ```yaml
-# custom_dataset.yaml
-datasets:
-  custom_eval:
-    vis_processor:
-      train:
-        name: "blip2_video_train"
-    text_processor:
-      train:
-        name: "blip_caption"
-    
-    annotation_file: "/path/to/your/annotations.txt"
-    video_path: "/path/to/your/videos/"
+evaluation_datasets:
+  feature_face_caption:
+    eval_file_path: /path/to/custom/annotations.txt
+    img_path: /path/to/custom/videos
+    task_pool: [emotion]
+    annotation_format: auto
+    transcription_path: transcripts.csv
+    face_feature_path: face_features
+    video_feature_path: video_features
+    audio_feature_path: audio_features
+    max_new_tokens: 500
+    batch_size: 1
 ```
+
+All relative resource paths are resolved from the directory containing
+`eval_file_path`. An emotion-only task does not need either reasoning JSON.
+FaceMAE, VideoMAE, and HuBERT features must already exist; this evaluation path
+does not run online feature extraction.
 
 **Step 3**: Run evaluation:
 
 ```bash
-torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/custom_eval.yaml --dataset custom_eval
+torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/custom_eval.yaml --dataset feature_face_caption
 ```
 
 ---

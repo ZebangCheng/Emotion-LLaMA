@@ -151,12 +151,8 @@ For detailed Gradio API documentation, please refer to:
 Due to copyright restrictions, we are unable to provide the raw videos or extracted images. Please visit the official MER2023 website to apply for access to the dataset.
 > http://merchallenge.cn/datasets  
 
-Then specify the path to Dataset in the [dataset config file](minigpt4\configs\datasets\firstface\featureface.yaml#L7):
-
-```yaml
-# Set Dataset video path
-image_path: /home/czb/big_space/datasets/Emotion/MER2023/video
-```
+Dataset paths and behavior are configured in YAML; the complete Stage 1
+example is shown below.
 
 **2. Prepare Multi-modal Encoders**
 To extract rich and comprehensive emotion features, we use the HuBERT model as the Audio Encoder, the EVA model as the Global Encoder, the MAE model as the Local Encoder, and the VideoMAE model as the Temporal Encoder. In practice, to save GPU memory, we do not load all Encoders directly onto the GPU but instead load the extracted features. You can download the processed feature files through the following Google Drive link and save them to the dataset folder.
@@ -164,27 +160,46 @@ To extract rich and comprehensive emotion features, we use the HuBERT model as t
 > https://drive.google.com/drive/folders/1DqGSBgpRo7TuGNqMJo9BYg6smJE20MG4?usp=drive_link
   
 
-Please modify the `get()` function in the [dataset file](minigpt4/datasets/datasets/first_face.py#L177) to set the path for reading the features.
+Place the precomputed FaceMAE, VideoMAE, and HuBERT feature trees beside the
+annotation file, or set their paths explicitly in the YAML configuration. All
+three feature trees are required; training does not extract them online.
 
 The specific feature extraction process can be referenced in the contents of the "feature_extract" folder. Detailed instructions will come soon.
 > https://drive.google.com/drive/folders/1d-Sg5fAskt2s6OOEUNXFaM2u-C055Whj?usp=sharing
 
 
 **3. Set dataset configuration**  
-In the [dataset configuration file](minigpt4\configs\datasets\firstface\featureface.yaml#L10), select the use of MERR_coarse_grained.txt. There are a total of 28,618 coarse-grained video samples for the first stage of training.
+Configure Stage 1 in `train_configs/Emotion-LLaMA_finetune.yaml` (or override
+the same keys in the default dataset YAML):
 
+```yaml
+datasets:
+  feature_face_caption:
+    task_pool: [emotion, reason]
+    annotation_format: auto
+    build_info:
+      image_path: /path/to/MER2023/video
+      ann_path: /path/to/MER2023/MERR_coarse_grained.txt
+      transcription_path: transcription_en_all.csv
+      coarse_grained_json_path: MERR_coarse_grained.json
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
+```
+
+Relative resource paths are resolved from the directory containing
+`ann_path`. The transcript is optional but recommended. The
+`annotation_format: auto` setting accepts compact `N E` rows (`name emotion`)
+and legacy `N C E [V]` rows (`name frame_count emotion [valence]`). There are
+28,618 coarse-grained samples for Stage 1.
 
 **4. Prepare Multi-task Instruction**  
 
-First, set the type of tasks in the [dataset file](minigpt4/datasets/datasets/first_face.py#L61):
-```python
-self.task_pool = [
-    "emotion",
-    "reason",
-    # "reason_v2",
-]
-```
-Here, the "emotion" task represents a multi-modal emotion recognition task, while the "reason" task represents a multi-modal emotion inference task. Different tasks will randomly select different prompts from different instruction pools.
+The configured `emotion` task performs multimodal emotion recognition, while
+`reason` loads the `caption` field from `coarse_grained_json_path`. Each task
+randomly selects a prompt from its instruction pool; no Python source edit is
+required. See the [dataset configuration guide](docs/dataset/configuration.md)
+for Stage 2 and emotion-only examples.
 
 
 **5. Run**  

@@ -68,26 +68,33 @@ ckpt: "/path/to/Emotion-LLaMA/checkpoints/save_checkpoint/Emotion_LLaMA.pth"
 
 ### Step 2: Configure Fine-Grained Dataset
 
-In `minigpt4/configs/datasets/firstface/featureface.yaml`, switch to fine-grained annotations:
+Configure the Stage 2 dataset in
+`train_configs/minigptv2_tuning_stage_2.yaml`:
 
 ```yaml
-# Use fine-grained annotations for Stage 2
-annotation_file: MERR_fine_grained.txt
+datasets:
+  feature_face_caption:
+    task_pool: [reason_v2]
+    annotation_format: auto
+    build_info:
+      image_path: /path/to/MER2023/video
+      ann_path: /path/to/MER2023/MERR_fine_grained.txt
+      transcription_path: transcription_en_all.csv
+      fine_grained_json_path: MERR_fine_grained.json
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
 ```
 
-This provides 4,487 samples with detailed multimodal reasoning.
+This provides 4,487 samples with detailed multimodal reasoning. Relative
+resource paths are resolved from the directory containing `ann_path`. The
+transcription CSV is optional but recommended, while all three precomputed
+feature trees are required.
 
 ### Step 3: Set Advanced Task Instructions
 
-Modify the task pool in `minigpt4/datasets/datasets/first_face.py`:
-
-```python
-self.task_pool = [
-    # "emotion",     # Disabled for Stage 2
-    # "reason",      # Disabled for Stage 2
-    "reason_v2",     # Advanced reasoning task
-]
-```
+The `task_pool: [reason_v2]` setting in the YAML above selects the advanced
+reasoning task. No dataset source edit is needed.
 
 The `reason_v2` task focuses on:
 - Detailed multimodal analysis
@@ -97,17 +104,12 @@ The `reason_v2` task focuses on:
 
 ### Step 4: Retrieve Multimodal Descriptions
 
-Enable loading of fine-grained captions from the JSON file:
-
-**In `minigpt4/datasets/datasets/first_face.py`:**
-```python
-caption = self.fine_grained_dict[video_name]['smp_reason_caption']
-
-# caption = ""  # Disable this during training
-```
+`reason_v2` automatically loads the `smp_reason_caption` field from the JSON
+file configured by `fine_grained_json_path`.
 
 {: .warning }
-> Only use empty caption (`caption = ""`) during **testing** on EMER dataset, not during training!
+> Keep the fine-grained JSON configured during training. Evaluation generation
+> uses the instruction input and does not require editing the dataset source.
 
 ---
 
@@ -234,12 +236,9 @@ After training, evaluate emotion reasoning on the EMER benchmark.
 
 ### Prepare for Testing
 
-Set caption to empty string in `minigpt4/datasets/datasets/first_face.py`:
-
-```python
-# caption = self.fine_grained_dict[video_name]['smp_reason_caption']
-caption = ""  # Enable for testing reasoning
-```
+In `eval_configs/eval_emotion_EMER.yaml`, select `task_pool: [reason_v2]` and
+configure `fine_grained_json_path` plus the three feature roots. The target
+caption is not included in the generation prompt, so no Python edit is needed.
 
 ### Configure Evaluation
 
@@ -292,12 +291,25 @@ Your trained model should achieve similar or better results.
 
 Combine multiple reasoning tasks:
 
-```python
-self.task_pool = [
-    "reason",      # Weight: 30%
-    "reason_v2",   # Weight: 70%
-]
+```yaml
+task_pool:
+  - reason
+  - reason
+  - reason
+  - reason_v2
+  - reason_v2
+  - reason_v2
+  - reason_v2
+  - reason_v2
+  - reason_v2
+  - reason_v2
+build_info:
+  coarse_grained_json_path: MERR_coarse_grained.json
+  fine_grained_json_path: MERR_fine_grained.json
 ```
+
+Repeated task names act as sampling weights; this example gives `reason` and
+`reason_v2` a 30/70 split. Mixed reasoning requires both JSON resources.
 
 ### Curriculum Learning
 

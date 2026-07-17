@@ -24,9 +24,16 @@ datasets:
 
 evaluation_datasets:
   feature_face_caption:
-    eval_file_path: /home/user/selected_face/face_emotion/relative_test3_NCEV.txt # MER2023
+    eval_file_path: /home/user/selected_face/face_emotion/MERR_fine_grained.txt
 
     img_path: /home/czb/big_space/datasets/Emotion/MER2023/video
+    task_pool: [reason_v2]
+    annotation_format: auto
+    transcription_path: transcription_en_all.csv
+    fine_grained_json_path: MERR_fine_grained.json
+    face_feature_path: mae_340_UTT
+    video_feature_path: maeV_399_UTT
+    audio_feature_path: HL-UTT
 
     # eval_file_path: /home/user/selected_face/DFEW/reltive_DFEW_set_1_test.txt
     # img_path: /home/user/selected_face/DFEW/images     

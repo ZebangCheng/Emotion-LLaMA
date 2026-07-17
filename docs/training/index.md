@@ -63,12 +63,8 @@ Visit the official MER2023 website to apply for dataset access:
 http://merchallenge.cn/datasets
 ```
 
-After obtaining access, specify the dataset path in `minigpt4/configs/datasets/firstface/featureface.yaml`:
-
-```yaml
-# Set Dataset video path
-image_path: /path/to/datasets/Emotion/MER2023/video
-```
+After obtaining access, configure the dataset paths in the Stage 1 training
+YAML as shown in Step 3.
 
 ### Step 2: Prepare Multi-modal Encoders
 
@@ -84,33 +80,42 @@ To extract rich emotion features, we use:
 Download the pre-extracted features:
 [Google Drive Link](https://drive.google.com/drive/folders/1DqGSBgpRo7TuGNqMJo9BYg6smJE20MG4?usp=drive_link)
 
-Save the features to your dataset folder, then modify the `get()` function in `minigpt4/datasets/datasets/first_face.py` to set the feature paths.
+Save the features to your dataset folder and configure the three feature roots
+in YAML. FaceMAE, VideoMAE, and HuBERT feature files are all required; the
+training dataset does not extract them online.
 
 {: .note }
 > The specific feature extraction process is available in the "feature_extract" folder: [Google Drive Link](https://drive.google.com/drive/folders/1d-Sg5fAskt2s6OOEUNXFaM2u-C055Whj?usp=sharing)
 
 ### Step 3: Configure Dataset
 
-In `minigpt4/configs/datasets/firstface/featureface.yaml`, select the coarse-grained annotations:
+Set the following keys in `train_configs/Emotion-LLaMA_finetune.yaml` (or
+override the same keys in the default dataset YAML):
 
 ```yaml
-# Use coarse-grained annotations for Stage 1
-annotation_file: MERR_coarse_grained.txt
+datasets:
+  feature_face_caption:
+    task_pool: [emotion, reason]
+    annotation_format: auto
+    build_info:
+      image_path: /path/to/MER2023/video
+      ann_path: /path/to/MER2023/MERR_coarse_grained.txt
+      transcription_path: transcription_en_all.csv
+      coarse_grained_json_path: MERR_coarse_grained.json
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
 ```
 
-This provides 28,618 samples for pre-training.
+Relative metadata and feature paths are resolved from the directory containing
+`ann_path`. The transcription CSV is optional but recommended. This setup uses
+28,618 coarse-grained samples for pre-training.
 
 ### Step 4: Configure Multi-task Instructions
 
-Set the task types in `minigpt4/datasets/datasets/first_face.py`:
-
-```python
-self.task_pool = [
-    "emotion",      # Multi-modal emotion recognition task
-    "reason",       # Multi-modal emotion inference task
-    # "reason_v2",  # Advanced reasoning (Stage 2)
-]
-```
+`task_pool: [emotion, reason]` in the YAML above enables multimodal emotion
+recognition and coarse-grained emotion inference. `reason_v2` is reserved for
+the Stage 2 fine-grained configuration.
 
 Each task randomly selects prompts from different instruction pools:
 

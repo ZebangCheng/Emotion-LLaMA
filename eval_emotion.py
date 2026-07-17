@@ -15,7 +15,10 @@ from minigpt4.common.eval_utils import prepare_texts, init_model, eval_parser, c
 from minigpt4.conversation.conversation import CONV_VISION_minigptv2
 from minigpt4.common.registry import registry
 
-from minigpt4.datasets.datasets.first_face import FeatureFaceDataset
+from minigpt4.datasets.datasets.first_face import (
+    FeatureFaceDataset,
+    feature_face_dataset_kwargs,
+)
 from minigpt4.datasets.datasets.mer2024 import MER2024Dataset
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
@@ -52,16 +55,23 @@ vis_processor = registry.get_processor_class(vis_processor_cfg.name).from_config
 
 print(args.dataset)
 if 'feature_face_caption' in args.dataset:
-    eval_file_path = cfg.evaluation_datasets_cfg["feature_face_caption"]["eval_file_path"]
-    img_path = cfg.evaluation_datasets_cfg["feature_face_caption"]["img_path"]
-    batch_size = cfg.evaluation_datasets_cfg["feature_face_caption"]["batch_size"]
-    max_new_tokens = cfg.evaluation_datasets_cfg["feature_face_caption"]["max_new_tokens"]
+    dataset_config = cfg.evaluation_datasets_cfg["feature_face_caption"]
+    eval_file_path = dataset_config["eval_file_path"]
+    img_path = dataset_config["img_path"]
+    batch_size = dataset_config["batch_size"]
+    max_new_tokens = dataset_config["max_new_tokens"]
     print(eval_file_path)
     print(img_path)
     print(batch_size)
     print(max_new_tokens)
 
-    data = FeatureFaceDataset(vis_processor, text_processor, img_path, eval_file_path)
+    data = FeatureFaceDataset(
+        vis_processor,
+        text_processor,
+        img_path,
+        eval_file_path,
+        **feature_face_dataset_kwargs(dataset_config),
+    )
     # print(data)
     # print(data[0])
     eval_dataloader = DataLoader(data, batch_size=batch_size, shuffle=False)
