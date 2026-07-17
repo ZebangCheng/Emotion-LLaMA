@@ -1,5 +1,6 @@
 import argparse
 import os
+import tempfile
 import time
 from threading import Thread
 from PIL import Image
@@ -159,13 +160,21 @@ def get_first_frame(video_path):
 
 def extract_audio_from_video(video_path):
     video = VideoFileClip(video_path)
-    audio = video.audio
-    # audio.write_audiofile("audio.wav")
+    try:
+        audio = video.audio
+        with tempfile.TemporaryDirectory(prefix="emotion_llama_audio_") as temp_dir:
+            audio_path = os.path.join(temp_dir, "audio.wav")
+            audio.write_audiofile(
+                audio_path,
+                fps=16000,
+                codec='pcm_s16le',
+                ffmpeg_params=['-ac', '1'],
+            )
+            samples, sr = sf.read(audio_path)
+            return samples, sr
+    finally:
+        video.close()
 
-    audio_path = "audio.wav"
-    audio.write_audiofile(audio_path, fps=16000, codec='pcm_s16le', ffmpeg_params=['-ac', '1'])
-    samples, sr = sf.read(audio_path)
-    return samples, sr
 
 class Chat:
     def __init__(self, model, vis_processor, device='cuda:0', stopping_criteria=None):
@@ -301,4 +310,3 @@ class Chat:
         msg = "Received."
 
         return msg
-    
