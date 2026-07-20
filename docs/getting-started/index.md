@@ -111,11 +111,12 @@ https://huggingface.co/TencentGameMate/chinese-hubert-large
 
 Save to `Emotion-LLaMA/checkpoints/transformer/chinese-hubert-large/`
 
-Specify the path in `minigpt4/conversation/conversation.py`:
+Specify the path in `eval_configs/demo.yaml`:
 
-```python
+```yaml
 # Set HuBERT-large model path
-model_file = "checkpoints/transformer/chinese-hubert-large"
+model:
+  audio_model_path: "checkpoints/transformer/chinese-hubert-large"
 ```
 
 ---

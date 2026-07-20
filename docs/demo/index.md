@@ -81,11 +81,12 @@ https://huggingface.co/TencentGameMate/chinese-hubert-large
 
 Save to `Emotion-LLaMA/checkpoints/transformer/chinese-hubert-large/`
 
-**Step 2**: Configure the HuBERT path in `minigpt4/conversation/conversation.py`:
+**Step 2**: Configure the HuBERT path in `eval_configs/demo.yaml`:
 
-```python
+```yaml
 # Set HuBERT-large model path
-model_file = "checkpoints/transformer/chinese-hubert-large"
+model:
+  audio_model_path: "checkpoints/transformer/chinese-hubert-large"
 ```
 
 **Step 3**: Download the Emotion-LLaMA demo model:
@@ -98,7 +99,7 @@ Save to `Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth`
 
 ```yaml
 # Set Emotion-LLaMA path
-ckpt: "/path/to/Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth"
+ckpt: "checkpoints/save_checkpoint/Emoation_LLaMA.pth"
 ```
 
 **Step 5**: Install additional dependencies:
@@ -245,21 +246,18 @@ repetition_penalty = 1.0  # Default: 1.0
 
 ### Batch Processing
 
-Process multiple videos programmatically:
+Process multiple videos from the terminal with one reusable runtime:
 
-```python
-import glob
-from app import process_video_question
-
-videos = glob.glob("examples/*.mp4")
-prompt = "[emotion] What is the emotion expressed in this video?"
-
-results = {}
-for video_path in videos:
-    result = process_video_question(video_path, prompt)
-    results[video_path] = result
-    print(f"{video_path}: {result}")
+```bash
+python batch_infer.py \
+  --video-dir examples \
+  --prompt "[emotion] What is the emotion expressed in this video?" \
+  --output predictions.jsonl \
+  --resume
 ```
+
+See [Batch Inference](../api/batch-inference.md) for CSV/JSONL manifests,
+single-video mode, output schema, and resume behavior.
 
 ---
 

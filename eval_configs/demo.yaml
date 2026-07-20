@@ -7,7 +7,8 @@ model:
   # low_resource: False 
   prompt_template: '[INST] {} [/INST]'
 
-  ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth"
+  ckpt: "checkpoints/save_checkpoint/Emoation_LLaMA.pth"
+  audio_model_path: "checkpoints/transformer/chinese-hubert-large"
 
   lora_r: 64
   lora_alpha: 16
