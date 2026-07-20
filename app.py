@@ -57,6 +57,18 @@ cfg = Config(args)
 device = 'cuda'
 
 model_config = cfg.model_cfg
+audio_model_path = os.path.expanduser(
+    os.fspath(
+        model_config.get(
+            "audio_model_path",
+            "checkpoints/transformer/chinese-hubert-large",
+        )
+    )
+)
+if not os.path.isabs(audio_model_path):
+    audio_model_path = os.path.abspath(
+        os.path.join(registry.get_path("repo_root"), audio_model_path)
+    )
 
 print("model_config:", model_config)
 model_cls = registry.get_model_class(model_config.arch)
@@ -569,7 +581,12 @@ def gradio_taskselect(idx):
 
 
 
-chat = Chat(model, vis_processor, device=device)
+chat = Chat(
+    model,
+    vis_processor,
+    device=device,
+    audio_model_path=audio_model_path,
+)
 
 title = """<h1 align="center">Emotion-LLaMA Demo</h1>"""
 description = 'Welcome to Our Emotion-LLaMA Chatbot Demo!'

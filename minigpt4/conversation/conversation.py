@@ -270,7 +270,9 @@ class Chat:
             output = self.model.llama_model.generate(*args, **kwargs)
         return output
 
-    def _get_audio_encoder(self):
+    def load_audio_encoder(self):
+        """Load the audio feature extractor and HuBERT model at most once."""
+
         if self.audio_feature_extractor is None:
             self.audio_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
                 self.audio_model_path
@@ -299,7 +301,7 @@ class Chat:
             samples, sr = extract_audio_from_video(video_path)
             # print("samples:", samples)
 
-            feature_extractor, hubert_model = self._get_audio_encoder()
+            feature_extractor, hubert_model = self.load_audio_encoder()
             input_values = feature_extractor(samples, sampling_rate=sr, return_tensors="pt").input_values
             # print("input_values:", input_values)
             with torch.no_grad():
