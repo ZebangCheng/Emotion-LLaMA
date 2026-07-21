@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import tempfile
 import time
@@ -19,6 +20,9 @@ from enum import auto, Enum
 from typing import List, Tuple, Any
 
 from minigpt4.common.registry import registry
+
+
+logger = logging.getLogger(__name__)
 
 
 class SeparatorStyle(Enum):
@@ -147,7 +151,7 @@ CONV_VISION_minigptv2 = Conversation(
 def get_first_frame(video_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("Error: Cannot open video.")
+        logger.warning("Cannot open video: %s", video_path)
         return None
     ret, frame = cap.read()
     cap.release()
@@ -155,7 +159,7 @@ def get_first_frame(video_path):
     if ret:
         return frame
     else:
-        print("Error: Cannot read frame from video.")
+        logger.warning("Cannot read the first frame from video: %s", video_path)
         return None
 
 def extract_audio_from_video(video_path):
@@ -177,10 +181,22 @@ def extract_audio_from_video(video_path):
 
 
 class Chat:
-    def __init__(self, model, vis_processor, device='cuda:0', stopping_criteria=None):
+    def __init__(
+        self,
+        model,
+        vis_processor,
+        device='cuda:0',
+        stopping_criteria=None,
+        audio_model_path="checkpoints/transformer/chinese-hubert-large",
+        audio_feature_extractor=None,
+        audio_model=None,
+    ):
         self.device = device
         self.model = model
         self.vis_processor = vis_processor
+        self.audio_model_path = audio_model_path
+        self.audio_feature_extractor = audio_feature_extractor
+        self.audio_model = audio_model
 
         if stopping_criteria is not None:
             self.stopping_criteria = stopping_criteria
@@ -199,14 +215,16 @@ class Chat:
                        repetition_penalty=1.05, length_penalty=1, temperature=1.0, max_length=2000):
         conv.append_message(conv.roles[1], None)
         prompt = conv.get_prompt()
-        print('prompt:', prompt)
+        logger.debug("Inference prompt: %s", prompt)
         # print('img_list:', img_list)
         embs = self.model.get_context_emb(prompt, img_list)
 
         current_max_len = embs.shape[1] + max_new_tokens
         if current_max_len - max_length > 0:
-            print('Warning: The number of tokens in current conversation exceeds the max length. '
-                  'The model will not see the contexts outside the range.')
+            logger.warning(
+                "The conversation exceeds max_length; the oldest context "
+                "will be truncated."
+            )
         begin_idx = max(0, current_max_len - max_length)
         embs = embs[:, begin_idx:]
 
@@ -252,13 +270,27 @@ class Chat:
             output = self.model.llama_model.generate(*args, **kwargs)
         return output
 
+    def load_audio_encoder(self):
+        """Load the audio feature extractor and HuBERT model at most once."""
+
+        if self.audio_feature_extractor is None:
+            self.audio_feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(
+                self.audio_model_path
+            )
+        if self.audio_model is None:
+            from transformers import HubertModel
+
+            self.audio_model = HubertModel.from_pretrained(self.audio_model_path)
+            self.audio_model.eval()
+        return self.audio_feature_extractor, self.audio_model
+
     def encode_img(self, img_list):
         image = img_list[0]
         img_list.pop(0)
 
         # # video
         if isinstance(image, str):  # is a video path
-            print("isinstance str")
+            logger.debug("Encoding video path input")
             video_path = image
             raw_image = get_first_frame(video_path)
             # cv2.imwrite("fisrt_frame.jpg", raw_image)
@@ -269,14 +301,9 @@ class Chat:
             samples, sr = extract_audio_from_video(video_path)
             # print("samples:", samples)
 
-            model_file = "checkpoints/transformer/chinese-hubert-large"
-            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_file)
+            feature_extractor, hubert_model = self.load_audio_encoder()
             input_values = feature_extractor(samples, sampling_rate=sr, return_tensors="pt").input_values
             # print("input_values:", input_values)
-
-            from transformers import HubertModel
-            hubert_model = HubertModel.from_pretrained(model_file)
-            hubert_model.eval()
             with torch.no_grad():
                 hidden_states = hubert_model(input_values, output_hidden_states=True).hidden_states # tuple of (B, T, D)
                 # print("hidden_states:", hidden_states)
@@ -285,11 +312,11 @@ class Chat:
                 audio_feature = torch.mean(audio_feature, dim=1, keepdim=True)
 
         elif isinstance(image, Image.Image):
-            print("isinstance Image")
+            logger.debug("Encoding PIL image input")
             raw_image = image
             image = self.vis_processor(raw_image).unsqueeze(0).to(self.device)
         elif isinstance(image, torch.Tensor):
-            print("isinstance Tensor")
+            logger.debug("Encoding tensor input")
             if len(image.shape) == 3:
                 image = image.unsqueeze(0)
             image = image.to(self.device)
@@ -298,8 +325,8 @@ class Chat:
         video_features = torch.zeros([1, 2, 1024])
         video_features = torch.cat((video_features, audio_feature), dim=1)
 
-        print("audio faature shape:", audio_feature.shape)
-        print("video_features", video_features.shape)
+        logger.debug("Audio feature shape: %s", audio_feature.shape)
+        logger.debug("Video feature shape: %s", video_features.shape)
         image_emb, _ = self.model.encode_img(image, video_features)
         img_list.append(image_emb)
 

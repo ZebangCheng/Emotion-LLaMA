@@ -68,7 +68,7 @@ Specify the path to Llama-2 in the [model config file](minigpt4/configs/models/m
 
 ```yaml
 # Set Llama-2-7b-chat-hf path
-llama_model: "/home/user/project/Emotion-LLaMA/checkpoints/Llama-2-7b-chat-hf"
+llama_model: "checkpoints/Llama-2-7b-chat-hf"
 ```
 
 Specify the path to MiniGPT-v2 in the [config file](train_configs/Emotion-LLaMA_finetune.yaml#L9):
@@ -103,11 +103,12 @@ Detailed examples of multimodal emotion recognition and reasoning performed by t
 > https://huggingface.co/TencentGameMate/chinese-hubert-large
 
 
-2.Specify the path to HuBERT-large in the [conversation file](minigpt4/conversation/conversation.py#L263):
+2.Specify the path to HuBERT-large in the [demo config file](eval_configs/demo.yaml):
 
 ```yaml
 # Set HuBERT-large model path
-model_file = "checkpoints/transformer/chinese-hubert-large"
+model:
+  audio_model_path: "checkpoints/transformer/chinese-hubert-large"
 ```
 
 3.Download the Emotion-LLaMA demo model from Googel Drive to `Emotion-LLaMA/checkpoints/save_checkpoint/`:
@@ -119,7 +120,7 @@ model_file = "checkpoints/transformer/chinese-hubert-large"
 
 ```yaml
 # Set Emotion-LLaMA path
-ckpt: "/home/user/project/Emotion-LLaMA/checkpoints/save_checkpoint/Emoation_LLaMA.pth"
+ckpt: "checkpoints/save_checkpoint/Emoation_LLaMA.pth"
 ```
 
 5.Install the required packages:  
@@ -143,7 +144,20 @@ For detailed Gradio API documentation, please refer to:
 - [📖 English API Guide](https://zebangcheng.github.io/Emotion-LLaMA/api/en.html)  
 - [📖 中文 API 指南](https://zebangcheng.github.io/Emotion-LLaMA/api/zh.html)
 
+### Batch Inference - Terminal Runtime
 
+Run CSV/JSONL manifests without Gradio while loading the model only once:
+
+```bash
+python batch_infer.py \
+  --input videos.jsonl \
+  --output predictions.jsonl \
+  --resume
+```
+
+Single-video and directory modes are also supported. See the
+[Batch Inference guide](docs/api/batch-inference.md) for manifest fields,
+the output schema, path handling, resume guarantees, and exit codes.
 
 ## 💡 Training
 

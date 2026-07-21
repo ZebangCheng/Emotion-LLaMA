@@ -1,109 +1,91 @@
-import argparse
-import os
-import cv2
-import numpy as np
-from PIL import Image
-import torch
-import gradio as gr
-from minigpt4.common.config import Config
-from minigpt4.common.registry import registry
-from minigpt4.conversation.conversation import Conversation, SeparatorStyle, Chat
+"""Lightweight Gradio frontend backed by the reusable inference runtime."""
 
-# 解析命令行参数
-def parse_args():
-    parser = argparse.ArgumentParser(description="Demo")
-    parser.add_argument("--cfg-path", default='eval_configs/demo.yaml', help="配置文件路径。")
+import argparse
+from functools import partial
+
+import gradio as gr
+
+from minigpt4.inference import EmotionLLaMARuntime
+
+
+_default_runtime = None
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Emotion-LLaMA Gradio API")
+    parser.add_argument(
+        "--cfg-path",
+        default="eval_configs/demo.yaml",
+        help="path to the inference configuration file",
+    )
     parser.add_argument(
         "--options",
         nargs="+",
-        help="覆盖配置文件中的某些设置，格式为 xxx=yyy。",
+        help="configuration overrides in xxx=yyy format",
     )
-    args = parser.parse_args()
-    return args
+    parser.add_argument(
+        "--device",
+        help=(
+            "Torch device, for example cuda or cuda:1; cpu requires "
+            "model.low_resource=false"
+        ),
+    )
+    parser.add_argument("--host", default="0.0.0.0", help="server bind address")
+    parser.add_argument("--port", type=int, default=7889, help="server port")
+    parser.add_argument("--share", action="store_true", help="create a Gradio share URL")
+    return parser.parse_args(argv)
 
-def load_model():
-    args = parse_args()
-    # args.instruct_ckpt = False # # bbb 2025年1月4日
-    cfg = Config(args)
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    
-    model_config = cfg.model_cfg
-    model_cls = registry.get_model_class(model_config.arch)
-    model = model_cls.from_config(model_config).to(device)
-    
-    vis_processor_cfg = cfg.datasets_cfg.feature_face_caption.vis_processor.train
-    vis_processor = registry.get_processor_class(vis_processor_cfg.name).from_config(vis_processor_cfg)
-    
-    model.eval()
-    chat = Chat(model, vis_processor, device=device)
-    
-    return chat, device
 
-chat, device = load_model()
+def get_default_runtime():
+    """Return an import-safe default runtime for legacy Python integrations."""
 
-def get_first_frame(video_path):
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        return None
-    ret, frame = cap.read()
-    cap.release()
-    if ret:
-        return frame
-    return None
+    global _default_runtime
+    if _default_runtime is None:
+        _default_runtime = EmotionLLaMARuntime()
+    return _default_runtime
 
-def process_video_question(video_path, question):
-    if not os.path.exists(video_path):
-        return "错误：视频文件不存在。"
 
-    chat_state = Conversation(
-        system="",
-        roles=(r"<s>[INST] ", r" [/INST]"),
-        messages=[],
-        offset=2,
-        sep_style=SeparatorStyle.SINGLE,
-        sep="",
+def process_video_question(video_path, question, *, runtime=None):
+    """Analyze one server-local video path for the Gradio interface."""
+
+    runtime = runtime or get_default_runtime()
+    return runtime.analyze(video_path, question)
+
+
+def build_interface(runtime):
+    predict = partial(process_video_question, runtime=runtime)
+    return gr.Interface(
+        fn=predict,
+        inputs=[
+            gr.Textbox(
+                label="Video path",
+                placeholder="Enter a server-local video path, such as /path/to/video.mp4",
+            ),
+            gr.Textbox(
+                label="Question",
+                placeholder="For example: What emotion does the video convey?",
+            ),
+        ],
+        outputs=gr.Textbox(label="Model answer"),
+        title="Emotion-LLaMA API",
+        description="Enter a video path and prompt for Emotion-LLaMA inference.",
     )
 
-    # chat.upload_img(image, chat_state, [])
-    # chat.upload_img(video_path, chat_state, [])
-    chat_state.append_message(chat_state.roles[0], "<video><VideoHere></video> <feature><FeatureHere></feature>")
-    img_list = []
-    img_list.append(video_path)
 
-    print('question: ', question)
-    print('chat_state: ', chat_state)
-    chat.ask(question, chat_state)
+def main(argv=None):
+    args = parse_args(argv)
+    runtime = EmotionLLaMARuntime(
+        args.cfg_path,
+        options=args.options,
+        device=args.device,
+    )
+    interface = build_interface(runtime)
+    interface.queue().launch(
+        server_name=args.host,
+        server_port=args.port,
+        share=args.share,
+    )
 
-    print('img_list: ', img_list)
-    if len(img_list) > 0:
-        if not isinstance(img_list[0], torch.Tensor):
-            chat.encode_img(img_list)
-
-    response = chat.answer(
-        conv=chat_state,
-        img_list=img_list,
-        temperature=0.2,
-        max_new_tokens=500,
-        max_length=2000
-    )[0]
-    
-    print('output:', response)
-    return response
-
-iface = gr.Interface(
-    fn=process_video_question,
-    inputs=[
-        gr.Textbox(label="视频路径", placeholder="输入视频文件路径，例如：/path/to/video.mp4"),
-        gr.Textbox(label="问题", placeholder="输入你的问题，例如：视频中的人物表达了什么情绪？")
-    ],
-    outputs=gr.Textbox(label="模型回答"),
-    title="Emotion-LLaMA API",
-    description="输入视频路径和问题，Emotion-LLaMA 将解析视频并回答你的问题。",
-)
 
 if __name__ == "__main__":
-    # iface.launch(server_name="0.0.0.0", server_port=7889, share=True)
-    # iface.launch(server_name="0.0.0.0", server_port=7889, share=False, enable_queue=True) # out
-    iface.queue().launch(server_name="0.0.0.0", server_port=7889, share=False)
-
-
+    main()
