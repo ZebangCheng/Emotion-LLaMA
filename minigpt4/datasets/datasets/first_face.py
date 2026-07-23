@@ -21,6 +21,17 @@ FEATURE_FACE_PATH_KEYS = (
 )
 SUPPORTED_TASKS = ("emotion", "reason", "reason_v2")
 ANNOTATION_FORMATS = ("auto", "ne", "ncev")
+DEFAULT_EMOTION_LABELS = (
+    "neutral",
+    "angry",
+    "happy",
+    "sad",
+    "worried",
+    "surprise",
+    "fear",
+    "contempt",
+    "doubt",
+)
 
 
 def _resolve_dataset_path(path, base_dir):
@@ -41,6 +52,9 @@ def feature_face_dataset_kwargs(dataset_config, path_config=None):
     annotation_format = dataset_config.get("annotation_format", None)
     if annotation_format is not None:
         kwargs["annotation_format"] = annotation_format
+    labels = dataset_config.get("labels", None)
+    if labels is not None:
+        kwargs["labels"] = labels
     for key in FEATURE_FACE_PATH_KEYS:
         value = path_config.get(key, None)
         if value is not None:
@@ -65,6 +79,19 @@ def _validate_task_pool(task_pool):
     if invalid:
         raise ValueError(error_message)
     return list(task_pool)
+
+
+def _validate_labels(labels):
+    if labels is None:
+        return list(DEFAULT_EMOTION_LABELS)
+    if isinstance(labels, str) or not isinstance(labels, Sequence) or not labels:
+        raise ValueError("labels must be a non-empty list or tuple")
+    result = [str(label).strip() for label in labels]
+    if any(not label for label in result):
+        raise ValueError("labels cannot contain an empty value")
+    if len(set(result)) != len(result):
+        raise ValueError("labels must not contain duplicates")
+    return result
 
 
 def _get_transcript_sentence(character_lines, video_name):
@@ -115,6 +142,9 @@ class FeatureFaceDataset(Dataset):
         face_feature_path="mae_340_UTT",
         video_feature_path="maeV_399_UTT",
         audio_feature_path="HL-UTT",
+        labels=None,
+        evaluation_mode=False,
+        split="train",
     ):
 
         self.vis_root = vis_root
@@ -122,6 +152,13 @@ class FeatureFaceDataset(Dataset):
         self.vis_processor = vis_processor
         self.text_processor = text_processor
         self.task_pool = _validate_task_pool(task_pool)
+        self.labels = _validate_labels(labels)
+        self.evaluation_mode = bool(evaluation_mode)
+        self.split = str(split)
+        if self.evaluation_mode and len(set(self.task_pool)) != 1:
+            raise ValueError(
+                "evaluation_mode requires task_pool to contain exactly one task"
+            )
         _validate_annotation_format(annotation_format)
         self.annotation_format = annotation_format
 
@@ -135,7 +172,9 @@ class FeatureFaceDataset(Dataset):
         ]
 
         self.emotion_instruction_pool = [
-            "Please determine which emotion label in the video represents: happy, sad, neutral, angry, worried, surprise, fear, contempt, doubt.",
+            "Please determine which emotion label in the video represents: {}.".format(
+                ", ".join(self.labels)
+            ),
 
             # "Please determine which emotion label in the video represents: happy, sad, neutral, angry, worried, surprise.",
             # "Identify the displayed emotion in the video: is it happy, sad, neutral, angry, worried, or surprise?",
@@ -171,12 +210,9 @@ class FeatureFaceDataset(Dataset):
         self.audio_feature_path = _resolve_dataset_path(
             audio_feature_path, self.file_path
         )
-        # emos = ['neutral', 'angry', 'happy', 'sad', 'worried', 'surprise']
-        emos = ['neutral', 'angry', 'happy', 'sad', 'worried', 'surprise', 'fear', 'contempt', 'doubt']
-
         self.emo2idx, self.idx2emo = {}, {}
-        for ii, emo in enumerate(emos): self.emo2idx[emo] = ii
-        for ii, emo in enumerate(emos): self.idx2emo[ii] = emo
+        for ii, emo in enumerate(self.labels): self.emo2idx[emo] = ii
+        for ii, emo in enumerate(self.labels): self.idx2emo[ii] = emo
 
         self.samples = []
         with open(ann_path, encoding="utf-8") as annotation_file:
@@ -264,19 +300,22 @@ class FeatureFaceDataset(Dataset):
 
 
         # random task
-        task = random.choice(self.task_pool)
+        task = self.task_pool[0] if self.evaluation_mode else random.choice(self.task_pool)
         if task == "emotion":
-            caption = emotion_label  # llama2 putput only emotion class
+            target_raw = emotion_label
+            caption = target_raw  # llama2 putput only emotion class
             caption = self.text_processor(caption)
             instruction_pool = self.emotion_instruction_pool
         elif task == "reason":
-            caption = self.MERR_coarse_grained_dict[video_name]['caption']
+            target_raw = self.MERR_coarse_grained_dict[video_name]['caption']
+            caption = target_raw
 
             caption = self.text_processor(caption)
             instruction_pool = self.reason_instruction_pool
 
         elif task == "reason_v2":
-            caption = self.MERR_fine_grained_dict[video_name]['smp_reason_caption']
+            target_raw = self.MERR_fine_grained_dict[video_name]['smp_reason_caption']
+            caption = target_raw
 
             # caption = "" # for test reasoning
 
@@ -290,9 +329,14 @@ class FeatureFaceDataset(Dataset):
             sentence = _get_transcript_sentence(self.character_lines, video_name)
             character_line = "The person in video says: {}. ".format(sentence)
         
-        instruction = "<video><VideoHere></video> <feature><FeatureHere></feature> {} [{}] {} ".format(character_line, task, random.choice(instruction_pool))
+        instruction_template = (
+            instruction_pool[0]
+            if self.evaluation_mode
+            else random.choice(instruction_pool)
+        )
+        instruction = "<video><VideoHere></video> <feature><FeatureHere></feature> {} [{}] {} ".format(character_line, task, instruction_template)
 
-        return {
+        sample = {
             "image": image,
             "video_features": video_features,
             "instruction_input": instruction,
@@ -300,6 +344,22 @@ class FeatureFaceDataset(Dataset):
             "emotion": emotion,
             "image_id": video_name
         }
+        if self.evaluation_mode:
+            dataset_name = getattr(self, "name", "feature_face_caption")
+            sample.update(
+                {
+                    "dataset": dataset_name,
+                    "split": self.split,
+                    "task": task,
+                    "sample_id": video_name,
+                    "sample_index": index,
+                    "instance_id": "{}:{}:{}:{}:{}".format(
+                        dataset_name, self.split, index, task, video_name
+                    ),
+                    "target_raw": target_raw,
+                }
+            )
+        return sample
     
     def extract_frame(self, video_path):
         video_capture = cv2.VideoCapture(video_path)

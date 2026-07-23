@@ -404,6 +404,68 @@ class FeatureFaceDatasetTest(unittest.TestCase):
             },
         )
 
+    def test_evaluation_mode_adds_stable_metadata_and_preserves_raw_target(self):
+        def normalized_text(value):
+            return value.lower().replace("!", "")
+
+        Path(self.root, "fine.json").write_text(
+            '{"sample": {"smp_reason_caption": "Raised Voice!"}}',
+            encoding="utf-8",
+        )
+        dataset = self.make_dataset(
+            vis_processor=identity,
+            text_processor=normalized_text,
+            task_pool=["reason_v2"],
+            fine_grained_json_path="fine.json",
+            transcription_path=None,
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+            evaluation_mode=True,
+            split="val",
+        )
+        dataset.name = "feature_face_caption"
+
+        first = dataset[0]
+        second = dataset[0]
+
+        self.assertEqual(first["task"], "reason_v2")
+        self.assertEqual(first["target_raw"], "Raised Voice!")
+        self.assertEqual(first["answer"], "raised voice")
+        self.assertEqual(first["sample_index"], 0)
+        self.assertEqual(first["sample_id"], "sample")
+        self.assertEqual(first["split"], "val")
+        self.assertEqual(first["instance_id"], second["instance_id"])
+        self.assertEqual(first["instruction_input"], second["instruction_input"])
+
+    def test_evaluation_mode_requires_one_task(self):
+        with self.assertRaisesRegex(ValueError, "exactly one task"):
+            self.make_dataset(
+                task_pool=["emotion", "reason"],
+                coarse_grained_json_path="coarse.json",
+                evaluation_mode=True,
+            )
+
+    def test_configured_labels_drive_targets_and_instruction(self):
+        dataset = self.make_dataset(
+            annotation_text="sample calm\n",
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            labels=["calm", "excited"],
+            transcription_path=None,
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+            evaluation_mode=True,
+        )
+
+        sample = dataset[0]
+
+        self.assertEqual(dataset.labels, ["calm", "excited"])
+        self.assertEqual(sample["answer"], "calm")
+        self.assertIn("calm, excited", sample["instruction_input"])
+
     def test_transcript_requires_name_and_sentence_columns(self):
         invalid_transcripts = {
             "missing-name.csv": "speaker,sentence\nsample,hello\n",
@@ -505,6 +567,15 @@ class FeatureFaceDatasetTest(unittest.TestCase):
 
         self.assertEqual(kwargs["annotation_format"], "ne")
 
+    def test_dataset_kwargs_forward_configured_labels(self):
+        labels = ["calm", "excited"]
+        kwargs = self.dataset_module.feature_face_dataset_kwargs(
+            {"labels": labels},
+            {},
+        )
+
+        self.assertIs(kwargs["labels"], labels)
+
 
 class FeatureFaceConfigForwardingTest(unittest.TestCase):
     def test_builder_forwards_shared_dataset_kwargs_to_dataset_constructor(self):
@@ -554,34 +625,57 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
             )
         )
 
-    def test_evaluation_scripts_use_shared_dataset_config_forwarder(self):
+    def test_evaluation_scripts_delegate_to_shared_cli(self):
         for relative_path in ("eval_emotion.py", "eval_emotion_EMER.py"):
             with self.subTest(relative_path=relative_path):
                 source = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
                 tree = ast.parse(source)
-                helper_calls = [
+                shared_imports = [
                     node
                     for node in ast.walk(tree)
-                    if isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Name)
-                    and node.func.id == "feature_face_dataset_kwargs"
+                    if isinstance(node, ast.ImportFrom)
+                    and node.module == "minigpt4.evaluation.cli"
+                    and any(alias.name == "main" for alias in node.names)
                 ]
-                dataset_calls = [
+                main_calls = [
                     node
                     for node in ast.walk(tree)
                     if isinstance(node, ast.Call)
                     and isinstance(node.func, ast.Name)
-                    and node.func.id == "FeatureFaceDataset"
+                    and node.func.id == "main"
                 ]
 
-                self.assertTrue(helper_calls)
-                self.assertTrue(
-                    any(
-                        keyword.arg is None
-                        for call in dataset_calls
-                        for keyword in call.keywords
-                    )
-                )
+                self.assertTrue(shared_imports)
+                self.assertTrue(main_calls)
+
+    def test_shared_evaluation_cli_uses_dataset_config_forwarder(self):
+        source = (
+            REPOSITORY_ROOT / "minigpt4" / "evaluation" / "cli.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        helper_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "feature_face_dataset_kwargs"
+        ]
+        dataset_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "FeatureFaceDataset"
+        ]
+
+        self.assertTrue(helper_calls)
+        self.assertTrue(
+            any(
+                keyword.arg is None
+                for call in dataset_calls
+                for keyword in call.keywords
+            )
+        )
 
     def test_shipped_configs_expose_dataset_behavior(self):
         def load_config(relative_path):
@@ -651,6 +745,11 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
                     path_keys | {"eval_file_path", "img_path"} <= set(dataset)
                 )
                 self.assertNotIn("build_info", dataset)
+                if relative_path.endswith("eval_emotion.yaml"):
+                    self.assertEqual(
+                        dataset["labels"],
+                        ["neutral", "angry", "happy", "sad", "worried", "surprise"],
+                    )
                 if reasoning_path_key is not None:
                     self.assertIn(reasoning_path_key, dataset)
                     self.assertTrue(

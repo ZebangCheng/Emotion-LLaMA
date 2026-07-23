@@ -28,6 +28,8 @@ evaluation_datasets:
 
     img_path: /home/czb/big_space/datasets/Emotion/MER2023/video
     task_pool: [emotion]
+    # Keep this benchmark's historical six-class metric contract explicit.
+    labels: [neutral, angry, happy, sad, worried, surprise]
     annotation_format: auto
     transcription_path: transcription_en_all.csv
     face_feature_path: mae_340_UTT
