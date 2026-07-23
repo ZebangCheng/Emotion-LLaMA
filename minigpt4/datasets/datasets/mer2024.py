@@ -25,12 +25,22 @@ import cv2
     
 
 class MER2024Dataset(Dataset):
-    def __init__(self, vis_processor, text_processor, vis_root, ann_path):
+    def __init__(
+        self,
+        vis_processor,
+        text_processor,
+        vis_root,
+        ann_path,
+        evaluation_mode=False,
+        split="train",
+    ):
 
         self.vis_root = vis_root
 
         self.vis_processor = vis_processor
         self.text_processor = text_processor
+        self.evaluation_mode = bool(evaluation_mode)
+        self.split = str(split)
 
 
         self.emotion_instruction_pool = [
@@ -94,9 +104,10 @@ class MER2024Dataset(Dataset):
         video_features = torch.cat((FaceMAE_feats, VideoMAE_feats, Audio_feats), dim=0)
 
         # random task
-        task = random.choice(self.task_pool)
+        task = self.task_pool[0] if self.evaluation_mode else random.choice(self.task_pool)
         if task == "emotion":
-            caption = t[2] # llama2 putput only emotion class
+            target_raw = t[2]
+            caption = target_raw # llama2 putput only emotion class
             caption = self.text_processor(caption)
             instruction_pool = self.emotion_instruction_pool
         
@@ -104,10 +115,15 @@ class MER2024Dataset(Dataset):
         sentence = self.character_lines.loc[self.character_lines['name'] == video_name, 'sentence_en'].values[0] # MER2024
 
         character_line = "The person in video says: {}. ".format(sentence)
-        instruction = "<video><VideoHere></video> <feature><FeatureHere></feature> {} [{}] {} ".format(character_line, task, random.choice(instruction_pool))
+        instruction_template = (
+            instruction_pool[0]
+            if self.evaluation_mode
+            else random.choice(instruction_pool)
+        )
+        instruction = "<video><VideoHere></video> <feature><FeatureHere></feature> {} [{}] {} ".format(character_line, task, instruction_template)
         # print(instruction)
         
-        return {
+        sample = {
             "image": image,
             "video_features": video_features,
             "instruction_input": instruction,
@@ -115,6 +131,22 @@ class MER2024Dataset(Dataset):
             "emotion": emotion,
             "image_id": video_name
         }
+        if self.evaluation_mode:
+            dataset_name = getattr(self, "name", "mer2024_caption")
+            sample.update(
+                {
+                    "dataset": dataset_name,
+                    "split": self.split,
+                    "task": task,
+                    "sample_id": video_name,
+                    "sample_index": index,
+                    "instance_id": "{}:{}:{}:{}:{}".format(
+                        dataset_name, self.split, index, task, video_name
+                    ),
+                    "target_raw": target_raw,
+                }
+            )
+        return sample
     
     def extract_frame(self, video_path):
         # Open the video file

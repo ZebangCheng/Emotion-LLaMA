@@ -399,7 +399,15 @@ def merge_rank_records(rank_records):
     nondeterminism problem.
     """
     merged = {}
-    conflict_fields = ("target", "prediction", "task", "sample_id", "sample_index")
+    conflict_fields = (
+        "dataset",
+        "split",
+        "target",
+        "prediction",
+        "task",
+        "sample_id",
+        "sample_index",
+    )
     for records in rank_records:
         for source_record in records:
             record = dict(source_record)

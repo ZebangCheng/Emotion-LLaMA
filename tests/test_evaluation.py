@@ -276,6 +276,73 @@ class ValidationTrackerTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "finite"):
                 tracker.update(value, 0)
 
+    def test_split_validation_never_substitutes_test_for_validation(self):
+        validate = self.tracker_module.validate_split_configuration
+
+        self.assertIsNone(
+            validate(
+                available_splits={"train", "test"},
+                train_splits=["train"],
+                valid_splits=[],
+                test_splits=["test"],
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "validation.*missing"):
+            validate(
+                available_splits={"train", "test"},
+                train_splits=["train"],
+                valid_splits=["val"],
+                test_splits=["test"],
+            )
+        with self.assertRaisesRegex(ValueError, "both validation and test"):
+            validate(
+                available_splits={"train", "val"},
+                train_splits=["train"],
+                valid_splits=["val"],
+                test_splits=["val"],
+            )
+
+    def test_evaluate_only_requires_an_explicit_test_split(self):
+        with self.assertRaisesRegex(ValueError, "explicitly configured test"):
+            self.tracker_module.validate_split_configuration(
+                available_splits={"train"},
+                train_splits=[],
+                valid_splits=[],
+                test_splits=[],
+                evaluate_only=True,
+            )
+
+    def test_split_validation_selects_explicit_primary_validation_split(self):
+        primary = self.tracker_module.validate_split_configuration(
+            available_splits={"train", "dev", "holdout"},
+            train_splits=["train"],
+            valid_splits=["dev", "holdout"],
+            test_splits=[],
+            best_model_split="holdout",
+        )
+
+        self.assertEqual(primary, "holdout")
+
+    def test_eval_dataset_collapse_rejects_multiple_metric_sources(self):
+        collapse = self.tracker_module.collapse_single_eval_datasets
+        train_dataset = object()
+        val_dataset = object()
+        datasets, batch_sizes = collapse(
+            {"train": [train_dataset], "val": [val_dataset]},
+            {"train": [1], "val": [2]},
+            train_splits=["train"],
+        )
+
+        self.assertEqual(datasets["train"], [train_dataset])
+        self.assertIs(datasets["val"], val_dataset)
+        self.assertEqual(batch_sizes["val"], 2)
+        with self.assertRaisesRegex(ValueError, "exactly one dataset"):
+            collapse(
+                {"train": [train_dataset], "val": [val_dataset, object()]},
+                {"train": [1], "val": [2, 2]},
+                train_splits=["train"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

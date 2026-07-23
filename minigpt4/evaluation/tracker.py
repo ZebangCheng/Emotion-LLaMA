@@ -4,6 +4,89 @@ import math
 import numbers
 
 
+SPLIT_GROUP_NAMES = ("train", "validation", "test")
+
+
+def validate_split_configuration(
+    available_splits,
+    train_splits,
+    valid_splits,
+    test_splits,
+    evaluate_only=False,
+    best_model_split=None,
+):
+    """Validate explicit split roles without inferring validation from test data."""
+    available = set(available_splits)
+    groups = {
+        "train": list(train_splits),
+        "validation": list(valid_splits),
+        "test": list(test_splits),
+    }
+    for group_name, split_names in groups.items():
+        if len(set(split_names)) != len(split_names):
+            raise ValueError("{} splits contain duplicates".format(group_name))
+        missing = [split for split in split_names if split not in available]
+        if missing:
+            raise ValueError(
+                "configured {} split(s) are missing from the datasets: {}".format(
+                    group_name, ", ".join(missing)
+                )
+            )
+
+    for left_index, left_name in enumerate(SPLIT_GROUP_NAMES):
+        for right_name in SPLIT_GROUP_NAMES[left_index + 1 :]:
+            overlap = set(groups[left_name]) & set(groups[right_name])
+            if overlap:
+                raise ValueError(
+                    "dataset split(s) cannot be both {} and {}: {}".format(
+                        left_name, right_name, ", ".join(sorted(overlap))
+                    )
+                )
+
+    if not evaluate_only and len(groups["train"]) != 1:
+        raise ValueError("training requires exactly one configured train split")
+    if evaluate_only and not groups["test"]:
+        raise ValueError(
+            "evaluate-only mode requires at least one explicitly configured test split"
+        )
+
+    if groups["validation"]:
+        primary_split = best_model_split or groups["validation"][0]
+        if primary_split not in groups["validation"]:
+            raise ValueError(
+                "best_model_split {!r} is not in valid_splits".format(primary_split)
+            )
+    else:
+        if best_model_split is not None:
+            raise ValueError("best_model_split requires at least one valid split")
+        primary_split = None
+    return primary_split
+
+
+def collapse_single_eval_datasets(datasets, batch_sizes, train_splits):
+    """Collapse one-element val/test lists and reject ambiguous multi-dataset metrics."""
+    datasets = dict(datasets)
+    batch_sizes = dict(batch_sizes)
+    train_splits = set(train_splits)
+    for split_name in list(datasets):
+        if split_name in train_splits:
+            continue
+        split_datasets = datasets[split_name]
+        split_batch_sizes = batch_sizes[split_name]
+        if not isinstance(split_datasets, (list, tuple)):
+            continue
+        if len(split_datasets) != 1:
+            raise ValueError(
+                "validation/test split {!r} requires exactly one dataset, got {}".format(
+                    split_name, len(split_datasets)
+                )
+            )
+        datasets[split_name] = split_datasets[0]
+        if isinstance(split_batch_sizes, (list, tuple)):
+            batch_sizes[split_name] = split_batch_sizes[0]
+    return datasets, batch_sizes
+
+
 class ValidationTracker:
     """Track the best validation metric and an optional early-stop patience."""
 
@@ -91,7 +174,10 @@ class ValidationTracker:
                     state.get("metric_name"), self.metric_name
                 )
             )
-        if bool(state.get("greater_is_better", self.greater_is_better)) != self.greater_is_better:
+        checkpoint_direction = bool(
+            state.get("greater_is_better", self.greater_is_better)
+        )
+        if checkpoint_direction != self.greater_is_better:
             raise ValueError("checkpoint greater_is_better does not match current run")
 
         best_metric = state.get("best_metric")

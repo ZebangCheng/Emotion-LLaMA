@@ -30,6 +30,11 @@ from minigpt4.datasets.datasets.dataloader_utils import (
     MultiIterLoader,
     PrefetchLoader,
 )
+from minigpt4.evaluation.tracker import (
+    ValidationTracker,
+    collapse_single_eval_datasets,
+    validate_split_configuration,
+)
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader, DistributedSampler
 
@@ -60,6 +65,18 @@ class RunnerBase:
         self._lr_sched = None
 
         self.start_epoch = 0
+        self._splits_validated = False
+        self._best_model_split = None
+        self.validation_tracker = ValidationTracker(
+            metric_name=self.config.run_cfg.get(
+                "metric_for_best_model", "agg_metrics"
+            ),
+            greater_is_better=self.config.run_cfg.get(
+                "greater_is_better", True
+            ),
+            patience=self.config.run_cfg.get("early_stopping_patience", None),
+            min_delta=self.config.run_cfg.get("early_stopping_min_delta", 0.0),
+        )
 
         # self.setup_seeds()
         self.setup_output_dir()
@@ -165,7 +182,9 @@ class RunnerBase:
 
             if iters_per_epoch is None:
                 try:
-                    iters_per_epoch = len(self.dataloaders['train'])
+                    iters_per_epoch = len(
+                        self.dataloaders[self.train_splits[0]]
+                    )
                 except (AttributeError, TypeError):
                     iters_per_epoch = 10000
 
@@ -201,6 +220,7 @@ class RunnerBase:
             dict: {split_name: (tuples of) dataloader}
         """
         if self._dataloaders is None:
+            self._validate_splits()
 
             # concatenate map-style datasets and chain wds.DataPipe datasets separately
             # training set becomes a tuple (ConcatDataset, ChainDataset), both are
@@ -213,6 +233,9 @@ class RunnerBase:
             batch_sizes = {dataset_name: getattr(self.config.datasets_cfg, dataset_name).batch_size
                            for dataset_name in self.datasets.keys()}
             datasets, batch_sizes = reorg_datasets_by_split(self.datasets, batch_sizes)
+            datasets, batch_sizes = collapse_single_eval_datasets(
+                datasets, batch_sizes, self.train_splits
+            )
             self.datasets = datasets
             # self.datasets = concat_datasets(datasets)
 
@@ -304,7 +327,7 @@ class RunnerBase:
 
     @property
     def valid_splits(self):
-        valid_splits = self.config.run_cfg.get("valid_splits", [])
+        valid_splits = list(self.config.run_cfg.get("valid_splits", []))
 
         if len(valid_splits) == 0:
             logging.info("No validation splits found.")
@@ -313,13 +336,13 @@ class RunnerBase:
 
     @property
     def test_splits(self):
-        test_splits = self.config.run_cfg.get("test_splits", [])
+        test_splits = list(self.config.run_cfg.get("test_splits", []))
 
         return test_splits
 
     @property
     def train_splits(self):
-        train_splits = self.config.run_cfg.get("train_splits", [])
+        train_splits = list(self.config.run_cfg.get("train_splits", []))
 
         if len(train_splits) == 0:
             logging.info("Empty train splits.")
@@ -331,7 +354,13 @@ class RunnerBase:
         """
         Set to True to skip training.
         """
-        return self.config.run_cfg.evaluate
+        return self.config.run_cfg.get("evaluate", False)
+
+    @property
+    def best_model_split(self):
+        if self._best_model_split is not None:
+            return self._best_model_split
+        return self.config.run_cfg.get("best_model_split", None)
 
     @property
     def use_dist_eval_sampler(self):
@@ -343,9 +372,32 @@ class RunnerBase:
 
     @property
     def train_loader(self):
-        train_dataloader = self.dataloaders["train"]
+        train_dataloader = self.dataloaders[self.train_splits[0]]
 
         return train_dataloader
+
+    def _available_dataset_splits(self):
+        available = set()
+        for dataset in self.datasets.values():
+            if isinstance(dataset, dict):
+                available.update(dataset.keys())
+            else:
+                available.update(self.datasets.keys())
+                break
+        return available
+
+    def _validate_splits(self):
+        if self._splits_validated:
+            return
+        self._best_model_split = validate_split_configuration(
+            available_splits=self._available_dataset_splits(),
+            train_splits=self.train_splits,
+            valid_splits=self.valid_splits,
+            test_splits=self.test_splits,
+            evaluate_only=self.evaluate_only,
+            best_model_split=self.config.run_cfg.get("best_model_split", None),
+        )
+        self._splits_validated = True
 
     def setup_output_dir(self):
         lib_root = Path(registry.get_path("library_root"))
@@ -365,63 +417,117 @@ class RunnerBase:
 
     def train(self):
         start_time = time.time()
-        best_agg_metric = 0
-        best_epoch = 0
 
         self.log_config()
+        self._validate_splits()
+
+        if self.evaluate_only:
+            self.evaluate(cur_epoch="provided", skip_reload=True)
+            total_time = time.time() - start_time
+            logging.info(
+                "Evaluation time {}".format(
+                    str(datetime.timedelta(seconds=int(total_time)))
+                )
+            )
+            return
 
         # resume from checkpoint if specified
-        if not self.evaluate_only and self.resume_ckpt_path is not None:
+        if self.resume_ckpt_path is not None:
             self._load_checkpoint(self.resume_ckpt_path)
 
+        last_epoch = self.start_epoch - 1
         for cur_epoch in range(self.start_epoch, self.max_epoch):
+            last_epoch = cur_epoch
             # training phase
-            if not self.evaluate_only:
-                logging.info("Start training")
-                train_stats = self.train_epoch(cur_epoch)
-                self.log_stats(split_name="train", stats=train_stats)
+            logging.info("Start training")
+            train_stats = self.train_epoch(cur_epoch)
+            self.log_stats(split_name="train", stats=train_stats)
 
             # evaluation phase
+            should_stop = False
             if len(self.valid_splits) > 0:
+                validation_logs = {}
                 for split_name in self.valid_splits:
                     logging.info("Evaluating on {}.".format(split_name))
 
                     val_log = self.eval_epoch(
                         split_name=split_name, cur_epoch=cur_epoch
                     )
-                    if val_log is not None:
-                        if is_main_process():
-                            assert (
-                                "agg_metrics" in val_log
-                            ), "No agg_metrics found in validation log."
+                    if val_log is None:
+                        raise RuntimeError(
+                            "evaluation returned no metrics for split {!r}".format(
+                                split_name
+                            )
+                        )
+                    validation_logs[split_name] = val_log
 
-                            agg_metrics = val_log["agg_metrics"]
-                            if agg_metrics > best_agg_metric and split_name == "val":
-                                best_epoch, best_agg_metric = cur_epoch, agg_metrics
+                primary_log = validation_logs[self.best_model_split]
+                metric_name = self.validation_tracker.metric_name
+                if metric_name not in primary_log:
+                    raise KeyError(
+                        "metric_for_best_model {!r} is missing from {} metrics: {}".format(
+                            metric_name,
+                            self.best_model_split,
+                            ", ".join(sorted(primary_log.keys())),
+                        )
+                    )
+                tracker_update = self.validation_tracker.update(
+                    primary_log[metric_name], cur_epoch
+                )
+                if tracker_update["improved"]:
+                    self._save_checkpoint(cur_epoch, is_best=True)
+                self._save_checkpoint(cur_epoch, checkpoint_name="last")
+                should_stop = tracker_update["should_stop"]
 
-                                self._save_checkpoint(cur_epoch, is_best=True)
-
-                            val_log.update({"best_epoch": best_epoch})
-                            self.log_stats(val_log, split_name)
+                for split_name, val_log in validation_logs.items():
+                    if split_name == self.best_model_split:
+                        val_log.update(
+                            {
+                                "best_epoch": self.validation_tracker.best_epoch,
+                                "best_metric": self.validation_tracker.best_metric,
+                                "bad_epochs": self.validation_tracker.bad_epochs,
+                            }
+                        )
+                    self.log_stats(val_log, split_name)
 
             else:
                 # if no validation split is provided, we just save the checkpoint at the end of each epoch.
-                if not self.evaluate_only:
-                    self._save_checkpoint(cur_epoch, is_best=False)
+                self._save_checkpoint(cur_epoch, is_best=False)
 
-            if self.evaluate_only:
-                break
+            should_stop = self._broadcast_early_stop(should_stop)
 
             if self.config.run_cfg.distributed:
                 dist.barrier()
 
+            if should_stop:
+                logging.info(
+                    "Early stopping at epoch %d after %d non-improving validation epoch(s).",
+                    cur_epoch,
+                    self.validation_tracker.bad_epochs,
+                )
+                break
+
         # testing phase
-        test_epoch = "best" if len(self.valid_splits) > 0 else cur_epoch
-        self.evaluate(cur_epoch=test_epoch, skip_reload=self.evaluate_only)
+        if len(self.test_splits) > 0:
+            test_epoch = (
+                "best" if self.validation_tracker.has_best else last_epoch
+            )
+            self.evaluate(cur_epoch=test_epoch, skip_reload=False)
 
         total_time = time.time() - start_time
         total_time_str = str(datetime.timedelta(seconds=int(total_time)))
         logging.info("Training time {}".format(total_time_str))
+
+    def _broadcast_early_stop(self, should_stop):
+        if not dist.is_available() or not dist.is_initialized():
+            return bool(should_stop)
+        flag = torch.tensor(
+            [int(bool(should_stop)) if is_main_process() else 0],
+            dtype=torch.int32,
+            device=self.device,
+        )
+        dist.broadcast(flag, src=0)
+        return bool(flag.item())
 
     def evaluate(self, cur_epoch="best", skip_reload=False):
         test_logs = dict()
@@ -476,13 +582,16 @@ class RunnerBase:
             model=model,
             dataset=self.datasets[split_name],
         )
-        results = self.task.evaluation(model, data_loader)
+        results = self.task.evaluation(
+            model, data_loader, cuda_enabled=self.cuda_enabled
+        )
 
         if results is not None:
             return self.task.after_evaluation(
                 val_result=results,
                 split_name=split_name,
                 epoch=cur_epoch,
+                dataset=self.datasets[split_name],
             )
 
     def unwrap_dist_model(self, model):
@@ -546,7 +655,8 @@ class RunnerBase:
                     collate_fn=collate_fn,
                     drop_last=True if is_train else False,
                 )
-                loader = PrefetchLoader(loader)
+                if self.cuda_enabled:
+                    loader = PrefetchLoader(loader)
 
                 if is_train:
                     loader = IterLoader(loader, use_distributed=self.use_distributed)
@@ -576,7 +686,7 @@ class RunnerBase:
         return loaders
 
     @main_process
-    def _save_checkpoint(self, cur_epoch, is_best=False):
+    def _save_checkpoint(self, cur_epoch, is_best=False, checkpoint_name=None):
         """
         Save the checkpoint at the current epoch.
         """
@@ -597,10 +707,18 @@ class RunnerBase:
             "config": self.config.to_dict(),
             "scaler": self.scaler.state_dict() if self.scaler else None,
             "epoch": cur_epoch,
+            "runner_state": self.validation_tracker.state_dict(),
         }
+        if checkpoint_name is not None and is_best:
+            raise ValueError("checkpoint_name and is_best cannot be combined")
+        checkpoint_suffix = (
+            checkpoint_name
+            if checkpoint_name is not None
+            else ("best" if is_best else cur_epoch)
+        )
         save_to = os.path.join(
             self.output_dir,
-            "checkpoint_{}.pth".format("best" if is_best else cur_epoch),
+            "checkpoint_{}.pth".format(checkpoint_suffix),
         )
         logging.info("Saving checkpoint at epoch {} to {}.".format(cur_epoch, save_to))
         torch.save(save_obj, save_to)
@@ -643,8 +761,10 @@ class RunnerBase:
         message = self.unwrap_dist_model(self.model).load_state_dict(state_dict,strict=False)
 
         self.optimizer.load_state_dict(checkpoint["optimizer"])
-        if self.scaler and "scaler" in checkpoint:
+        if self.scaler and checkpoint.get("scaler") is not None:
             self.scaler.load_state_dict(checkpoint["scaler"])
+
+        self.validation_tracker.load_state_dict(checkpoint.get("runner_state"))
 
         self.start_epoch = checkpoint["epoch"] + 1
         print("resume the checkpoint")

@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from minigpt4.common.config import Config
-from minigpt4.common.eval_utils import eval_parser, prepare_texts
+from minigpt4.common.eval_utils import eval_parser
 from minigpt4.common.registry import registry
 from minigpt4.conversation.conversation import CONV_VISION_minigptv2
 from minigpt4.datasets.datasets.first_face import (
@@ -20,6 +20,7 @@ from minigpt4.datasets.datasets.first_face import (
 )
 from minigpt4.datasets.datasets.mer2024 import MER2024Dataset
 from minigpt4.evaluation.evaluator import evaluate_records, write_evaluation_report
+from minigpt4.evaluation.prompting import prepare_conversation_texts
 
 
 SUPPORTED_DATASETS = ("feature_face_caption", "mer2024_caption")
@@ -98,6 +99,8 @@ def _build_dataset(cfg, dataset_name, vis_processor, text_processor):
             text_processor,
             dataset_cfg["img_path"],
             dataset_cfg["eval_file_path"],
+            evaluation_mode=True,
+            split="test",
         )
     dataset.name = dataset_name
     return dataset, dataset_cfg
@@ -122,7 +125,7 @@ def _generate_records(model, data_loader, dataset_name, dataset_cfg):
 
     for batch in data_loader:
         instructions = batch["instruction_input"]
-        texts = prepare_texts(instructions, conversation)
+        texts = prepare_conversation_texts(instructions, conversation)
         predictions = model.generate(
             batch["image"],
             batch["video_features"],

@@ -578,6 +578,65 @@ class FeatureFaceDatasetTest(unittest.TestCase):
 
 
 class FeatureFaceConfigForwardingTest(unittest.TestCase):
+    @staticmethod
+    def load_annotation_split_helper():
+        source = (
+            REPOSITORY_ROOT
+            / "minigpt4"
+            / "datasets"
+            / "builders"
+            / "image_text_pair_builder.py"
+        ).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        selected_nodes = [
+            node
+            for node in tree.body
+            if (
+                isinstance(node, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name)
+                    and target.id == "SUPPORTED_SPLITS"
+                    for target in node.targets
+                )
+            )
+            or (
+                isinstance(node, ast.FunctionDef)
+                and node.name == "annotation_paths_by_split"
+            )
+        ]
+        namespace = {}
+        exec(compile(ast.Module(selected_nodes, type_ignores=[]), "builder", "exec"), namespace)
+        return namespace["annotation_paths_by_split"]
+
+    def test_builder_annotation_mapping_is_explicit_and_legacy_safe(self):
+        annotation_paths_by_split = self.load_annotation_split_helper()
+
+        self.assertEqual(
+            annotation_paths_by_split({"ann_path": "legacy.txt"}),
+            {"train": "legacy.txt"},
+        )
+        self.assertEqual(
+            annotation_paths_by_split(
+                {
+                    "ann_path": "ignored-legacy.txt",
+                    "annotations": {
+                        "train": "train.txt",
+                        "val": "val.txt",
+                        "test": "test.txt",
+                    },
+                }
+            ),
+            {"train": "train.txt", "val": "val.txt", "test": "test.txt"},
+        )
+
+    def test_builder_annotation_mapping_rejects_unknown_or_empty_splits(self):
+        annotation_paths_by_split = self.load_annotation_split_helper()
+
+        with self.assertRaisesRegex(ValueError, "unsupported dataset split"):
+            annotation_paths_by_split({"annotations": {"dev": "dev.txt"}})
+        with self.assertRaisesRegex(ValueError, "cannot be empty"):
+            annotation_paths_by_split({"annotations": {}})
+
     def test_builder_forwards_shared_dataset_kwargs_to_dataset_constructor(self):
         source = (
             REPOSITORY_ROOT
