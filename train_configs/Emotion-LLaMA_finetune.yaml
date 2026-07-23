@@ -15,16 +15,23 @@ model:
 
 
 datasets:    
-  feature_face_caption: 
+  feature_face_caption:
     batch_size: 1
     task_pool: [emotion, reason]
+    evaluation_task: emotion
+    labels: [neutral, angry, happy, sad, worried, surprise]
     annotation_format: auto
     vis_processor:
       train:
         name: "blip2_image_train"
         image_size: 448
+      eval:
+        name: "blip2_image_eval"
+        image_size: 448
     text_processor:
       train:
+        name: "blip_caption"
+      eval:
         name: "blip_caption"
     sample_ratio: 30
     build_info:
@@ -67,8 +74,24 @@ run:
   amp: True
   resume_ckpt_path: null
 
-  evaluate: False 
+  # evaluate=True is test-only mode. Training-time validation is controlled by
+  # valid_splits and stays disabled until a val annotation is configured.
+  evaluate: False
   train_splits: ["train"]
+  valid_splits: []
+  test_splits: []
+  metric_for_best_model: macro_f1
+  best_model_split: null
+  greater_is_better: True
+  early_stopping_patience: null
+  early_stopping_min_delta: 0.0
+  evaluation:
+    task: classification
+    labels: [neutral, angry, happy, sad, worried, surprise]
+    generation:
+      max_new_tokens: 20
+      num_beams: 1
+      do_sample: False
 
   device: "cuda"
   world_size: 2

@@ -422,6 +422,36 @@ def create_runner_config_validator():
         type=list,
         help="Splits to use for testing. If not provided, will skip the testing.",
     )
+    validator.add_argument(
+        "metric_for_best_model",
+        type=str,
+        help="Validation metric used for best-checkpoint selection.",
+    )
+    validator.add_argument(
+        "best_model_split",
+        type=str,
+        help="Validation split used for best-checkpoint selection.",
+    )
+    validator.add_argument(
+        "greater_is_better",
+        type=bool,
+        help="Whether a larger validation metric is better.",
+    )
+    validator.add_argument(
+        "early_stopping_patience",
+        type=int,
+        help="Consecutive non-improving epochs before stopping; null disables it.",
+    )
+    validator.add_argument(
+        "early_stopping_min_delta",
+        type=float,
+        help="Minimum validation metric change required to count as improvement.",
+    )
+    validator.add_argument(
+        "evaluation",
+        type=dict,
+        help="Generation, label, and artifact settings for validation/testing.",
+    )
     # add arguments for accumulating gradient for iterations
     validator.add_argument(
         "accum_grad_iters",

@@ -17,6 +17,9 @@ evaluation run.
 - Configure every FeatureFace metadata and precomputed-feature path.
 - Load coarse- and fine-grained JSON files only when their tasks need them.
 - Support both compact `N E` annotations and legacy `N C E [V]` annotations.
+- Support explicit train, validation, and test annotation files without
+  inferring one role from another.
+- Preserve raw evaluation targets and stable sample identities for DDP merge.
 - Keep existing four-argument Python construction and emotion-only behavior.
 - Give missing or inconsistent configuration a clear error before training.
 
@@ -24,7 +27,7 @@ evaluation run.
 
 - Converting MER-Factory exports into Emotion-LLaMA annotations.
 - Extracting MAE, VideoMAE, or HuBERT features online.
-- Refactoring `MER2024Dataset`, which has a separate data layout.
+- Unifying the FeatureFace and MER2024 source data layouts.
 - Changing the nine-label emotion vocabulary or model checkpoints.
 - Fixing the legacy bitsandbytes Windows 8-bit loading path.
 
@@ -60,6 +63,33 @@ not pass the complete OmegaConf object into the dataset.
 Stage 1 uses `task_pool: [emotion, reason]`. The `reason` task reads the
 `caption` field from `coarse_grained_json_path`; the fine-grained JSON is not
 needed for this task pool.
+
+### Explicit dataset splits
+
+The legacy `build_info.ann_path` key remains train-only. To create held-out
+loaders, use an explicit annotation map:
+
+```yaml
+datasets:
+  feature_face_caption:
+    evaluation_task: emotion
+    build_info:
+      image_path: /path/to/MER2023/video
+      annotations:
+        train: /path/to/MER2023/train.txt
+        val: /path/to/MER2023/val.txt
+        test: /path/to/MER2023/test.txt
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
+```
+
+Only `train`, `val`, and `test` keys are accepted. The builder never creates a
+missing validation split from `test`, and `annotations` takes precedence if an
+old `ann_path` is also present. Validation and test use the `eval` processors,
+disable random task/prompt selection, and therefore require exactly one task.
+Set `evaluation_task` when the training `task_pool` contains more than one
+task.
 
 For backward compatibility, the shipped default YAML keeps its existing
 `image_path` and `ann_path` values. It adds the behavioral keys and relative
@@ -124,6 +154,9 @@ evaluation_datasets:
     img_path: /path/to/MER2023/video
     task_pool:
       - emotion
+    labels: [neutral, angry, happy, sad, worried, surprise]
+    label_aliases:
+      happiness: happy
     annotation_format: auto
     transcription_path: transcription_en_all.csv
     face_feature_path: mae_340_UTT
@@ -132,7 +165,11 @@ evaluation_datasets:
 ```
 
 `eval_emotion.py` and `eval_emotion_EMER.py` forward the optional values while
-preserving their current `eval_file_path` and `img_path` interface.
+preserving their current `eval_file_path` and `img_path` interface. Labels are
+ordered; use the benchmark's exact class set because it defines macro metrics
+and confusion-matrix order. Aliases map generated spellings to canonical
+labels. Unknown, empty, and ambiguous predictions remain invalid rather than
+falling back to `neutral`.
 
 ## Python interface
 
@@ -154,6 +191,9 @@ FeatureFaceDataset(
     face_feature_path="mae_340_UTT",
     video_feature_path="maeV_399_UTT",
     audio_feature_path="HL-UTT",
+    labels=None,
+    evaluation_mode=False,
+    split="train",
 )
 ```
 
@@ -165,6 +205,13 @@ Defaults preserve direct emotion-only construction:
   `HL-UTT` directories beside `ann_path`;
 - coarse and fine JSON paths must be provided when their corresponding tasks
   are enabled.
+
+`evaluation_mode=True` requires one configured task, chooses its first prompt
+deterministically, and adds `dataset`, `split`, `task`, `sample_id`,
+`sample_index`, `instance_id`, and `target_raw` to each sample. The raw target
+is captured before the text processor changes case, punctuation, or length.
+Normal training construction does not add these keys, preserving the existing
+batch contract.
 
 All path parameters accept strings and `os.PathLike` values.
 
@@ -226,7 +273,8 @@ or `doubt`.
 
 ## Compatibility guarantees
 
-- Registry name `feature_face_caption` and builder output remain unchanged.
+- Registry name `feature_face_caption` and legacy `ann_path` builder output
+  remain unchanged.
 - The old four-positional-argument constructor remains valid.
 - The default task remains emotion recognition.
 - Output keys and instruction markers remain unchanged.
@@ -246,6 +294,8 @@ Unit tests use temporary annotation, JSON, CSV, and feature trees. They cover:
 6. Compact NE and legacy NCEV parsing, including malformed rows.
 7. Empty, string, and unknown task pools.
 8. Clear errors for missing task resources and transcript columns or samples.
+9. Legacy train-only and explicit train/val/test builder contracts.
+10. Deterministic evaluation metadata and preservation of raw targets.
 
 The repository's legacy Python 2 VQA demo prevents a clean Python 3
 `compileall` baseline. Verification therefore targets all changed Python files,
