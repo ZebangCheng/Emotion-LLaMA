@@ -1,7 +1,9 @@
+import ast
 import csv
 import importlib.util
 import json
 import math
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +14,7 @@ EVALUATOR_PATH = (
     REPOSITORY_ROOT / "minigpt4" / "evaluation" / "evaluator.py"
 )
 TRACKER_PATH = REPOSITORY_ROOT / "minigpt4" / "evaluation" / "tracker.py"
+CLI_PATH = REPOSITORY_ROOT / "minigpt4" / "evaluation" / "cli.py"
 
 
 def load_source_module(name, path):
@@ -19,6 +22,32 @@ def load_source_module(name, path):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def load_legacy_reasoning_csv_writer(csv_safe_value):
+    tree = ast.parse(CLI_PATH.read_text(encoding="utf-8"))
+    writer_function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_write_legacy_reasoning_csv"
+    )
+    namespace = {
+        "csv": csv,
+        "csv_safe_value": csv_safe_value,
+        "os": os,
+        "Path": Path,
+        "tempfile": tempfile,
+    }
+    exec(
+        compile(
+            ast.Module(body=[writer_function], type_ignores=[]),
+            str(CLI_PATH),
+            "exec",
+        ),
+        namespace,
+    )
+    return namespace["_write_legacy_reasoning_csv"]
 
 
 class ClassificationEvaluationTests(unittest.TestCase):
@@ -113,6 +142,8 @@ class ClassificationEvaluationTests(unittest.TestCase):
             self.evaluator.evaluate_classification(
                 [], labels=["happy"], aliases={"joy": "neutral"}
             )
+        with self.assertRaisesRegex(ValueError, "reserved"):
+            self.evaluator.evaluate_classification([], labels=["__INVALID__"])
         with self.assertRaisesRegex(ValueError, "target"):
             self.evaluator.evaluate_classification(
                 [{"instance_id": "0", "target": "joy", "prediction": "happy"}],
@@ -229,6 +260,84 @@ class DistributedMergeAndArtifactTests(unittest.TestCase):
             self.assertEqual(metrics["sample_count"], 1)
             self.assertFalse(list(Path(temporary_directory).glob("*.tmp")))
 
+    def test_csv_outputs_neutralize_formula_cells_but_jsonl_stays_raw(self):
+        dangerous_values = (
+            "=1+1",
+            "+SUM(A1:A2)",
+            "-2+3",
+            "@SUM(A1:A2)",
+            "  =1+1",
+            " \ufeff=1+1",
+            "\t=1+1",
+            "\r+1",
+            "\n-1",
+        )
+        for value in dangerous_values:
+            with self.subTest(value=value):
+                self.assertEqual(self.evaluator.csv_safe_value(value), "'" + value)
+        self.assertEqual(self.evaluator.csv_safe_value("safe text"), "safe text")
+        self.assertEqual(self.evaluator.csv_safe_value(-1), -1)
+        self.assertEqual(self.evaluator.csv_safe_value(None), "")
+        self.assertEqual(
+            self.evaluator.csv_safe_value({"text": "=1+1"}),
+            '{"text": "=1+1"}',
+        )
+
+        report = self.evaluator.evaluate_reasoning(
+            [
+                {
+                    "instance_id": "0",
+                    "sample_id": "=HYPERLINK(\"https://example.invalid\")",
+                    "target": "safe target",
+                    "prediction": "\t@SUM(A1:A2)",
+                    "=untrusted_header": "+untrusted value",
+                }
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            paths = self.evaluator.write_evaluation_report(
+                report, temporary_directory
+            )
+            jsonl_record = json.loads(
+                Path(paths["jsonl"]).read_text(encoding="utf-8").splitlines()[0]
+            )
+            with Path(paths["csv"]).open(
+                encoding="utf-8", newline=""
+            ) as csv_file:
+                csv_record = next(csv.DictReader(csv_file))
+
+            self.assertEqual(
+                jsonl_record["sample_id"],
+                "=HYPERLINK(\"https://example.invalid\")",
+            )
+            self.assertEqual(jsonl_record["prediction"], "\t@SUM(A1:A2)")
+            self.assertEqual(
+                csv_record["sample_id"],
+                "'=HYPERLINK(\"https://example.invalid\")",
+            )
+            self.assertEqual(csv_record["prediction"], "'\t@SUM(A1:A2)")
+            self.assertEqual(csv_record["'=untrusted_header"], "'+untrusted value")
+
+    def test_legacy_reasoning_csv_neutralizes_identifiers_and_predictions(self):
+        writer = load_legacy_reasoning_csv_writer(
+            self.evaluator.csv_safe_value
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = writer(
+                [
+                    {
+                        "sample_id": "+SUM(A1:A2)",
+                        "prediction": "@SUM(A1:A2)",
+                    }
+                ],
+                temporary_directory,
+            )
+            with Path(path).open(encoding="utf-8", newline="") as csv_file:
+                row = next(csv.DictReader(csv_file))
+
+            self.assertEqual(row["names"], "'+SUM(A1:A2)")
+            self.assertEqual(row["chi_reasons"], "'@SUM(A1:A2)")
+
 
 class ValidationTrackerTests(unittest.TestCase):
     @classmethod
@@ -267,6 +376,42 @@ class ValidationTrackerTests(unittest.TestCase):
         restored.load_state_dict(tracker.state_dict())
         self.assertEqual(restored.best_metric, 0.8)
         self.assertEqual(restored.best_epoch, 2)
+
+    def test_resumed_best_checkpoint_prefers_the_resume_sibling(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            old_run = root / "old-run"
+            new_run = root / "new-run"
+            old_run.mkdir()
+            new_run.mkdir()
+            resume_path = old_run / "checkpoint_last.pth"
+            sibling_best = old_run / "checkpoint_best.pth"
+            stored_best = root / "stored-best.pth"
+            resume_path.write_bytes(b"last")
+            sibling_best.write_bytes(b"best")
+            stored_best.write_bytes(b"stored")
+
+            resolved = self.tracker_module.resolve_best_checkpoint_path(
+                resume_checkpoint_path=resume_path,
+                stored_best_checkpoint_path=stored_best,
+                output_dir=new_run,
+            )
+
+            self.assertEqual(Path(resolved), sibling_best.resolve())
+
+    def test_resumed_best_checkpoint_can_use_a_stored_path(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            stored_best = root / "checkpoint_best.pth"
+            stored_best.write_bytes(b"best")
+
+            resolved = self.tracker_module.resolve_best_checkpoint_path(
+                resume_checkpoint_path=root / "missing" / "checkpoint_last.pth",
+                stored_best_checkpoint_path=stored_best,
+                output_dir=root / "new-run",
+            )
+
+            self.assertEqual(Path(resolved), stored_best.resolve())
 
     def test_invalid_metrics_and_patience_fail_early(self):
         with self.assertRaisesRegex(ValueError, "at least 1"):

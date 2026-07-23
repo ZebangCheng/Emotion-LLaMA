@@ -2,9 +2,37 @@
 
 import math
 import numbers
+from pathlib import Path
 
 
 SPLIT_GROUP_NAMES = ("train", "validation", "test")
+
+
+def resolve_best_checkpoint_path(
+    resume_checkpoint_path=None,
+    stored_best_checkpoint_path=None,
+    output_dir=None,
+):
+    """Find an existing best checkpoint when a run resumes in a new job dir."""
+    candidates = []
+    if resume_checkpoint_path:
+        resume_path = Path(resume_checkpoint_path)
+        candidates.append(resume_path.parent / "checkpoint_best.pth")
+    if stored_best_checkpoint_path:
+        candidates.append(Path(stored_best_checkpoint_path))
+    if output_dir:
+        candidates.append(Path(output_dir) / "checkpoint_best.pth")
+
+    seen = set()
+    for candidate in candidates:
+        candidate = candidate.expanduser()
+        candidate_key = str(candidate.resolve())
+        if candidate_key in seen:
+            continue
+        seen.add(candidate_key)
+        if candidate.is_file():
+            return str(candidate.resolve())
+    return None
 
 
 def validate_split_configuration(

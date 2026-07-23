@@ -17,8 +17,13 @@ datasets:
       train:
         name: "blip2_image_train"
         image_size: 448
+      eval:
+        name: "blip2_image_eval"
+        image_size: 448
     text_processor:
       train:
+        name: "blip_caption"
+      eval:
         name: "blip_caption"
     sample_ratio: 30
 
@@ -45,8 +50,13 @@ evaluation_datasets:
   mer2024_caption:
     eval_file_path: /home/czb/big_space/datasets/Emotion/MER2024/MER2024-noise_NCE.txt # MER2024
     img_path: /home/czb/big_space/datasets/Emotion/MER2024/video-unlabeled-with-test2noise
+    labels: [neutral, angry, happy, sad, worried, surprise, fear, contempt, doubt]
+    transcription_path: transcription_all_new.csv
+    face_feature_path: mae_340_23_UTT
+    video_feature_path: maeVideo_399_23_UTT
+    audio_feature_path: HL_23_UTT
     max_new_tokens: 500
-    batch_size: 1  
+    batch_size: 1
 
 run:
   task: image_text_pretrain

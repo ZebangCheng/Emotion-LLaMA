@@ -9,7 +9,10 @@ from minigpt4.datasets.datasets.first_face import (
     FeatureFaceDataset,
     feature_face_dataset_kwargs,
 )
-from minigpt4.datasets.datasets.mer2024 import MER2024Dataset
+from minigpt4.datasets.datasets.mer2024 import (
+    MER2024Dataset,
+    mer2024_dataset_kwargs,
+)
 
 
 SUPPORTED_SPLITS = ("train", "val", "test")
@@ -118,6 +121,7 @@ class MER2024nBuilder(BaseDatasetBuilder):
         for split, ann_path in annotation_paths_by_split(build_info).items():
             is_train = split == "train"
             dataset_cls = self.train_dataset_cls if is_train else self.eval_dataset_cls
+            dataset_kwargs = mer2024_dataset_kwargs(self.config, build_info)
             datasets[split] = dataset_cls(
                 vis_processor=_processor_for_split(
                     self.vis_processors, split, "vis_processor"
@@ -129,6 +133,7 @@ class MER2024nBuilder(BaseDatasetBuilder):
                 vis_root=build_info.image_path,
                 evaluation_mode=not is_train,
                 split=split,
+                **dataset_kwargs,
             )
 
         return datasets

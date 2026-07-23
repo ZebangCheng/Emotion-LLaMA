@@ -18,8 +18,15 @@ from minigpt4.datasets.datasets.first_face import (
     FeatureFaceDataset,
     feature_face_dataset_kwargs,
 )
-from minigpt4.datasets.datasets.mer2024 import MER2024Dataset
-from minigpt4.evaluation.evaluator import evaluate_records, write_evaluation_report
+from minigpt4.datasets.datasets.mer2024 import (
+    MER2024Dataset,
+    mer2024_dataset_kwargs,
+)
+from minigpt4.evaluation.evaluator import (
+    csv_safe_value,
+    evaluate_records,
+    write_evaluation_report,
+)
 from minigpt4.evaluation.prompting import prepare_conversation_texts
 
 
@@ -101,6 +108,7 @@ def _build_dataset(cfg, dataset_name, vis_processor, text_processor):
             dataset_cfg["eval_file_path"],
             evaluation_mode=True,
             split="test",
+            **mer2024_dataset_kwargs(dataset_cfg),
         )
     dataset.name = dataset_name
     return dataset, dataset_cfg
@@ -186,7 +194,10 @@ def _write_legacy_reasoning_csv(records, output_dir):
             writer.writerow(["names", "chi_reasons"])
             for record in records:
                 writer.writerow(
-                    [record.get("sample_id", ""), record["prediction"]]
+                    [
+                        csv_safe_value(record.get("sample_id", "")),
+                        csv_safe_value(record["prediction"]),
+                    ]
                 )
             temporary_file.flush()
             os.fsync(temporary_file.fileno())

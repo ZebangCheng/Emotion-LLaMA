@@ -30,6 +30,8 @@ DEFAULT_EMOTION_LABELS = (
 )
 INVALID_LABEL = "__invalid__"
 SUPPORTED_EVALUATION_TASKS = ("auto", "classification", "reasoning")
+CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
+CSV_CONTROL_PREFIXES = ("\t", "\r", "\n")
 
 
 def _normalized_text(value):
@@ -64,7 +66,7 @@ def _validate_labels(labels):
 
     if not canonical_labels:
         raise ValueError("labels must contain at least one value")
-    if INVALID_LABEL in canonical_labels:
+    if _normalized_text(INVALID_LABEL) in normalized:
         raise ValueError("{} is reserved for invalid predictions".format(INVALID_LABEL))
     return canonical_labels, normalized
 
@@ -461,11 +463,24 @@ def _json_dump(value, handle, **kwargs):
     json.dump(value, handle, ensure_ascii=False, allow_nan=False, **kwargs)
 
 
-def _csv_value(value):
+def csv_safe_value(value):
+    """Serialize a CSV value and neutralize spreadsheet formula prefixes."""
     if isinstance(value, (dict, list, tuple)):
-        return json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True)
+        value = json.dumps(
+            value, ensure_ascii=False, allow_nan=False, sort_keys=True
+        )
     if value is None:
         return ""
+    if isinstance(value, str):
+        formula_candidate = value
+        while formula_candidate and (
+            formula_candidate[0].isspace() or formula_candidate[0] == "\ufeff"
+        ):
+            formula_candidate = formula_candidate[1:]
+        if value.startswith(CSV_CONTROL_PREFIXES) or formula_candidate.startswith(
+            CSV_FORMULA_PREFIXES
+        ):
+            return "'" + value
     return value
 
 
@@ -511,9 +526,11 @@ def write_evaluation_report(report, output_dir):
 
     def write_csv(handle):
         writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
-        writer.writeheader()
+        writer.writerow({field: csv_safe_value(field) for field in fieldnames})
         for record in records:
-            writer.writerow({key: _csv_value(value) for key, value in record.items()})
+            writer.writerow(
+                {key: csv_safe_value(value) for key, value in record.items()}
+            )
 
     _atomic_text_write(jsonl_path, write_jsonl)
     _atomic_text_write(csv_path, write_csv)

@@ -758,32 +758,69 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
             | {"image_path", "ann_path", "coarse_grained_json_path"}
             <= set(default_dataset["build_info"])
         )
+        mer2024_default = load_config(
+            "minigpt4/configs/datasets/firstface/mer2024.yaml"
+        )["datasets"]["mer2024_caption"]
+        self.assertEqual(len(mer2024_default["labels"]), 9)
+        self.assertTrue(
+            path_keys | {"image_path", "ann_path"}
+            <= set(mer2024_default["build_info"])
+        )
 
         training_configs = (
             (
                 "train_configs/Emotion-LLaMA_finetune.yaml",
                 ["emotion", "reason"],
                 "coarse_grained_json_path",
+                "emotion",
+                "classification",
+                "macro_f1",
             ),
             (
                 "train_configs/minigptv2_tuning_stage_2.yaml",
                 ["reason_v2"],
                 "fine_grained_json_path",
+                "reason_v2",
+                "reasoning",
+                "token_f1",
             ),
         )
-        for relative_path, task_pool, reasoning_path_key in training_configs:
+        for (
+            relative_path,
+            task_pool,
+            reasoning_path_key,
+            evaluation_task,
+            evaluation_family,
+            best_metric,
+        ) in training_configs:
             with self.subTest(relative_path=relative_path):
-                dataset = load_config(relative_path)["datasets"][
+                config = load_config(relative_path)
+                dataset = config["datasets"][
                     "feature_face_caption"
                 ]
+                run = config["run"]
                 self.assertEqual(dataset["task_pool"], task_pool)
+                self.assertEqual(dataset["evaluation_task"], evaluation_task)
                 self.assertEqual(dataset["annotation_format"], "auto")
+                self.assertEqual(
+                    dataset["vis_processor"]["eval"]["name"],
+                    "blip2_image_eval",
+                )
+                self.assertEqual(
+                    dataset["text_processor"]["eval"]["name"], "blip_caption"
+                )
                 self.assertNotIn("task_pool", dataset["build_info"])
                 self.assertNotIn("annotation_format", dataset["build_info"])
                 self.assertTrue(
                     path_keys | {"image_path", "ann_path", reasoning_path_key}
                     <= set(dataset["build_info"])
                 )
+                self.assertFalse(run["evaluate"])
+                self.assertEqual(run["valid_splits"], [])
+                self.assertEqual(run["test_splits"], [])
+                self.assertIsNone(run["early_stopping_patience"])
+                self.assertEqual(run["evaluation"]["task"], evaluation_family)
+                self.assertEqual(run["metric_for_best_model"], best_metric)
 
         evaluation_configs = (
             ("eval_configs/eval_emotion.yaml", ["emotion"], None),
@@ -795,11 +832,21 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
         )
         for relative_path, task_pool, reasoning_path_key in evaluation_configs:
             with self.subTest(relative_path=relative_path):
-                dataset = load_config(relative_path)["evaluation_datasets"][
+                config = load_config(relative_path)
+                dataset = config["evaluation_datasets"][
                     "feature_face_caption"
                 ]
+                processors = config["datasets"]["feature_face_caption"]
                 self.assertEqual(dataset["task_pool"], task_pool)
                 self.assertEqual(dataset["annotation_format"], "auto")
+                self.assertEqual(
+                    processors["vis_processor"]["eval"]["name"],
+                    "blip2_image_eval",
+                )
+                self.assertEqual(
+                    processors["text_processor"]["eval"]["name"],
+                    "blip_caption",
+                )
                 self.assertTrue(
                     path_keys | {"eval_file_path", "img_path"} <= set(dataset)
                 )
@@ -814,6 +861,15 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
                     self.assertTrue(
                         dataset["eval_file_path"].endswith("MERR_fine_grained.txt")
                     )
+
+        mer2024_evaluation = load_config("eval_configs/eval_emotion.yaml")[
+            "evaluation_datasets"
+        ]["mer2024_caption"]
+        self.assertEqual(len(mer2024_evaluation["labels"]), 9)
+        self.assertTrue(
+            path_keys | {"eval_file_path", "img_path"}
+            <= set(mer2024_evaluation)
+        )
 
 
 if __name__ == "__main__":

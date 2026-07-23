@@ -1,7 +1,12 @@
 datasets:
   mer2024_caption:
     data_type: images
-    
+    labels: [neutral, angry, happy, sad, worried, surprise, fear, contempt, doubt]
+
     build_info:
       image_path: /home/czb/big_space/datasets/Emotion/MER2024/video-unlabeled-with-test2noise
       ann_path: /home/czb/big_space/datasets/Emotion/MER2024/MER2024_noise_pseu_label_8348.txt
+      transcription_path: transcription_all_new.csv
+      face_feature_path: mae_340_23_UTT
+      video_feature_path: maeVideo_399_23_UTT
+      audio_feature_path: HL_23_UTT

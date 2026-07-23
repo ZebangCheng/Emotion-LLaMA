@@ -168,7 +168,7 @@ run:
 
 Monitor the training with:
 - **Training loss**: Should decrease steadily
-- **Validation accuracy**: Should improve over epochs
+- **Validation metrics**: Available only after explicit validation is enabled
 - **Checkpoints**: Saved in `checkpoints/save_checkpoint/`
 
 Expected training time: ~2-3 days on 4x A5000 GPUs
@@ -223,17 +223,97 @@ If training is interrupted, resume from the last checkpoint:
 resume_ckpt_path: "checkpoints/save_checkpoint/checkpoint_15.pth"
 ```
 
+Runs with validation also maintain `checkpoint_last.pth`; resume from that file
+to preserve the best-metric and early-stopping state. Keep its sibling
+`checkpoint_best.pth` as well: a resumed run can reuse that historical best
+even though the new job writes to a different output directory.
+
 ---
 
 ## Evaluation During Training
 
-To evaluate on validation set during training:
+Validation is disabled by default. It is enabled only when both the dataset
+and the runner explicitly name a validation split. The legacy
+`build_info.ann_path` form still creates a training split only, so existing
+training configurations do not start reading held-out data unexpectedly.
+
+First configure deterministic evaluation processors, one evaluation task, and
+explicit annotation files. `annotations` takes precedence over the legacy
+`ann_path` key:
+
+```yaml
+datasets:
+  feature_face_caption:
+    batch_size: 1
+    task_pool: [emotion, reason]
+    evaluation_task: emotion
+    labels: [neutral, angry, happy, sad, worried, surprise]
+    vis_processor:
+      train:
+        name: blip2_image_train
+        image_size: 448
+      eval:
+        name: blip2_image_eval
+        image_size: 448
+    text_processor:
+      train:
+        name: blip_caption
+      eval:
+        name: blip_caption
+    build_info:
+      image_path: /path/to/MER2023/video
+      annotations:
+        train: /path/to/MER2023/train.txt
+        val: /path/to/MER2023/val.txt
+        # test: /path/to/MER2023/test.txt
+      transcription_path: transcription_en_all.csv
+      coarse_grained_json_path: MERR_coarse_grained.json
+      face_feature_path: mae_340_UTT
+      video_feature_path: maeV_399_UTT
+      audio_feature_path: HL-UTT
+```
+
+Then opt in from the runner:
 
 ```yaml
 run:
-  evaluate: true
-  eval_epoch_interval: 5  # Evaluate every 5 epochs
+  evaluate: false
+  train_splits: [train]
+  valid_splits: [val]
+  test_splits: []
+
+  metric_for_best_model: macro_f1
+  best_model_split: val
+  greater_is_better: true
+  early_stopping_patience: 5  # null disables early stopping
+  early_stopping_min_delta: 0.0
+
+  evaluation:
+    task: classification
+    labels: [neutral, angry, happy, sad, worried, surprise]
+    generation:
+      max_new_tokens: 20
+      num_beams: 1
+      do_sample: false
 ```
+
+Validation runs at the end of every training epoch. It writes structured
+artifacts under `result/<split>/epoch_<epoch>/`, saves improvements to
+`checkpoint_best.pth`, and refreshes `checkpoint_last.pth` after every
+validated epoch. The checkpoint stores best metric, best epoch, and patience
+state, so resuming does not reset early stopping.
+
+`valid_splits` and `test_splits` must be disjoint and must exist in
+`build_info.annotations`. A `test` annotation is never inferred or reused as
+validation data. Multiple validation split names are supported for reporting;
+`best_model_split` selects the one used for checkpoint decisions. Each
+validation or test split currently accepts one dataset source.
+
+{: .warning }
+> `evaluate: true` means **evaluation-only**: training is skipped and only the
+> explicitly configured `test_splits` are evaluated. It is not the switch for
+> training-time validation. In evaluation-only mode, set `train_splits: []`,
+> `valid_splits: []`, and provide at least one `test_splits` entry.
 
 ---
 

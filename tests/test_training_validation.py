@@ -121,6 +121,25 @@ def load_runner_train_function():
     return namespace["train"]
 
 
+def load_runner_model_function():
+    tree = ast.parse(RUNNER_PATH.read_text(encoding="utf-8"))
+    runner_class = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "RunnerBase"
+    )
+    model_method = next(
+        node
+        for node in runner_class.body
+        if isinstance(node, ast.FunctionDef) and node.name == "model"
+    )
+    model_method.decorator_list = []
+    module = ast.Module(body=[model_method], type_ignores=[])
+    namespace = {"DDP": lambda model, **kwargs: (model, kwargs)}
+    exec(compile(module, str(RUNNER_PATH), "exec"), namespace)
+    return namespace["model"]
+
+
 class EvaluationTaskRecordTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -217,6 +236,10 @@ class RunnerValidationLifecycleTests(unittest.TestCase):
         runner.validation_tracker = self.tracker_module.ValidationTracker(
             metric_name="macro_f1", patience=patience
         )
+        runner._best_checkpoint_path = None
+        runner._mark_best_checkpoint_saved = lambda: setattr(
+            runner, "_best_checkpoint_path", "checkpoint_best.pth"
+        )
         runner.log_config = lambda: None
         runner._validate_splits = lambda: None
         runner._load_checkpoint = lambda path: None
@@ -271,6 +294,18 @@ class RunnerValidationLifecycleTests(unittest.TestCase):
         self.assertEqual(runner.saved, [(0, {"is_best": False})])
         self.assertFalse(runner.evaluated)
 
+    def test_resume_without_best_file_tests_latest_model_instead_of_crashing(self):
+        runner = self.make_runner(metrics=[0.2])
+        runner.validation_tracker.update(0.5, -1)
+        runner._best_checkpoint_path = None
+
+        self.train_function(runner)
+
+        self.assertEqual(
+            runner.evaluated,
+            [{"cur_epoch": 0, "skip_reload": False}],
+        )
+
     def test_evaluate_only_never_trains_or_saves(self):
         runner = self.make_runner(
             metrics=[],
@@ -296,7 +331,27 @@ class RunnerValidationLifecycleTests(unittest.TestCase):
             'self.validation_tracker.load_state_dict(checkpoint.get("runner_state"))',
             source,
         )
+        self.assertIn('checkpoint.get("best_checkpoint_path")', source)
         self.assertIn("cuda_enabled=self.cuda_enabled", source)
+
+    def test_model_already_on_cpu_is_still_assigned_for_evaluation(self):
+        model_function = load_runner_model_function()
+
+        class FakeModel:
+            device = torch.device("cpu")
+
+            def to(self, device):
+                raise AssertionError("model is already on the requested device")
+
+        model = FakeModel()
+        runner = types.SimpleNamespace(
+            _model=model,
+            _wrapped_model=None,
+            device=torch.device("cpu"),
+            use_distributed=False,
+        )
+
+        self.assertIs(model_function(runner), model)
 
 
 if __name__ == "__main__":

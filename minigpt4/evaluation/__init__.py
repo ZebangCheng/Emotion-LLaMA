@@ -12,6 +12,7 @@ from .evaluator import (
 from .tracker import (
     ValidationTracker,
     collapse_single_eval_datasets,
+    resolve_best_checkpoint_path,
     validate_split_configuration,
 )
 
@@ -24,6 +25,7 @@ __all__ = [
     "evaluate_reasoning",
     "evaluate_records",
     "merge_rank_records",
+    "resolve_best_checkpoint_path",
     "write_evaluation_report",
     "validate_split_configuration",
 ]

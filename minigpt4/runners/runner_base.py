@@ -33,6 +33,7 @@ from minigpt4.datasets.datasets.dataloader_utils import (
 from minigpt4.evaluation.tracker import (
     ValidationTracker,
     collapse_single_eval_datasets,
+    resolve_best_checkpoint_path,
     validate_split_configuration,
 )
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -67,6 +68,7 @@ class RunnerBase:
         self.start_epoch = 0
         self._splits_validated = False
         self._best_model_split = None
+        self._best_checkpoint_path = None
         self.validation_tracker = ValidationTracker(
             metric_name=self.config.run_cfg.get(
                 "metric_for_best_model", "agg_metrics"
@@ -97,16 +99,23 @@ class RunnerBase:
         """
         A property to get the DDP-wrapped model on the device.
         """
-        # move model to device
+        # Moving and wrapping are separate: a model may already be on the
+        # requested device but still need its initial wrapper assignment.
         if self._model.device != self.device:
             self._model = self._model.to(self.device)
 
-            # distributed training wrapper
+        if self._wrapped_model is None:
             if self.use_distributed:
-                if self._wrapped_model is None:
-                    self._wrapped_model = DDP(
-                        self._model, device_ids=[self.config.run_cfg.gpu], find_unused_parameters=True
-                    )
+                device_ids = (
+                    [self.config.run_cfg.gpu]
+                    if self.device.type == "cuda"
+                    else None
+                )
+                self._wrapped_model = DDP(
+                    self._model,
+                    device_ids=device_ids,
+                    find_unused_parameters=True,
+                )
             else:
                 self._wrapped_model = self._model
 
@@ -475,6 +484,7 @@ class RunnerBase:
                     primary_log[metric_name], cur_epoch
                 )
                 if tracker_update["improved"]:
+                    self._mark_best_checkpoint_saved()
                     self._save_checkpoint(cur_epoch, is_best=True)
                 self._save_checkpoint(cur_epoch, checkpoint_name="last")
                 should_stop = tracker_update["should_stop"]
@@ -510,7 +520,10 @@ class RunnerBase:
         # testing phase
         if len(self.test_splits) > 0:
             test_epoch = (
-                "best" if self.validation_tracker.has_best else last_epoch
+                "best"
+                if self.validation_tracker.has_best
+                and self._best_checkpoint_path is not None
+                else last_epoch
             )
             self.evaluate(cur_epoch=test_epoch, skip_reload=False)
 
@@ -528,6 +541,11 @@ class RunnerBase:
         )
         dist.broadcast(flag, src=0)
         return bool(flag.item())
+
+    def _mark_best_checkpoint_saved(self):
+        self._best_checkpoint_path = os.path.abspath(
+            os.path.join(self.output_dir, "checkpoint_best.pth")
+        )
 
     def evaluate(self, cur_epoch="best", skip_reload=False):
         test_logs = dict()
@@ -708,6 +726,7 @@ class RunnerBase:
             "scaler": self.scaler.state_dict() if self.scaler else None,
             "epoch": cur_epoch,
             "runner_state": self.validation_tracker.state_dict(),
+            "best_checkpoint_path": self._best_checkpoint_path,
         }
         if checkpoint_name is not None and is_best:
             raise ValueError("checkpoint_name and is_best cannot be combined")
@@ -727,7 +746,12 @@ class RunnerBase:
         """
         Load the best checkpoint for evaluation.
         """
-        checkpoint_path = os.path.join(self.output_dir, "checkpoint_best.pth")
+        checkpoint_path = self._best_checkpoint_path
+        if checkpoint_path is None or not os.path.isfile(checkpoint_path):
+            raise RuntimeError(
+                "best checkpoint is unavailable; resume with checkpoint_best.pth "
+                "beside the last checkpoint or run another improving validation epoch"
+            )
 
         logging.info("Loading checkpoint from {}.".format(checkpoint_path))
         checkpoint = torch.load(checkpoint_path, map_location="cpu")
@@ -752,8 +776,10 @@ class RunnerBase:
                 url_or_filename, check_hash=False, progress=True
             )
             checkpoint = torch.load(cached_file, map_location=self.device)
+            checkpoint_source = cached_file
         elif os.path.isfile(url_or_filename):
             checkpoint = torch.load(url_or_filename, map_location=self.device)
+            checkpoint_source = url_or_filename
         else:
             raise RuntimeError("checkpoint url or path is invalid")
 
@@ -765,6 +791,18 @@ class RunnerBase:
             self.scaler.load_state_dict(checkpoint["scaler"])
 
         self.validation_tracker.load_state_dict(checkpoint.get("runner_state"))
+        if self.validation_tracker.has_best:
+            self._best_checkpoint_path = resolve_best_checkpoint_path(
+                resume_checkpoint_path=checkpoint_source,
+                stored_best_checkpoint_path=checkpoint.get("best_checkpoint_path"),
+                output_dir=self.output_dir,
+            )
+            if self._best_checkpoint_path is None:
+                logging.warning(
+                    "The resumed tracker has a historical best metric, but no "
+                    "checkpoint_best.pth is available. Final testing will use "
+                    "the latest in-memory model unless validation improves."
+                )
 
         self.start_epoch = checkpoint["epoch"] + 1
         print("resume the checkpoint")

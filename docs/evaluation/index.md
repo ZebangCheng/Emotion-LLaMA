@@ -30,6 +30,39 @@ Emotion-LLaMA has been evaluated on multiple benchmark datasets:
 - **MER2024 Challenge** - Noise-robust recognition
 - **DFEW** - Zero-shot evaluation
 
+The two legacy entry points now use the same evaluator:
+
+- `eval_emotion.py` defaults to classification metrics;
+- `eval_emotion_EMER.py` defaults to reasoning diagnostics.
+
+Both commands accept `--output-dir`. If it is omitted, `run.save_path` from
+the YAML file is used. Each dataset writes the following artifacts below
+`<output-root>/<dataset-name>/`:
+
+| File | Contents |
+|:-----|:---------|
+| `predictions.jsonl` | One UTF-8 structured record per sample |
+| `predictions.csv` | The same sample-level fields in tabular form |
+| `metrics.json` | Aggregate metrics, per-class scores, and confusion matrix |
+
+Classification labels are an ordered YAML contract. Configure the exact
+benchmark vocabulary so macro scores and confusion-matrix rows are stable:
+
+```yaml
+evaluation_datasets:
+  feature_face_caption:
+    labels: [neutral, angry, happy, sad, worried, surprise]
+    label_aliases:
+      happiness: happy
+      anger: angry
+```
+
+Predictions that are empty, contain no configured label, or contain multiple
+different labels are recorded as invalid. They count as incorrect and appear
+in the `__invalid__` confusion-matrix column; they are never rewritten to
+`neutral`. `metrics.json` reports accuracy, macro and weighted
+precision/recall/F1, and `invalid_rate`.
+
 ---
 
 ## MER2023 Challenge
@@ -73,7 +106,13 @@ ckpt: "/path/to/checkpoints/save_checkpoint/stage2/checkpoint_best.pth"
 torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset feature_face_caption
 ```
 
-**Step 3**: View results in `checkpoints/save_checkpoint/stage2/result/MER2023.txt`
+**Step 3**: Inspect `predictions.jsonl`, `predictions.csv`, and `metrics.json`
+under `run.save_path/feature_face_caption/`. To select another location:
+
+```bash
+python eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml \
+  --dataset feature_face_caption --output-dir /path/to/evaluation-results
+```
 
 ### Metrics Explained
 
@@ -143,6 +182,13 @@ source edit.
 ```bash
 CUDA_VISIBLE_DEVICES=0 torchrun --nproc-per-node 1 eval_emotion_EMER.py --cfg-path eval_configs/eval_emotion_EMER.yaml
 ```
+
+The shared evaluator writes exact match and whitespace-token
+precision/recall/F1 as transparent lexical diagnostics. These are **not** the
+official semantic Clue Overlap or Label Overlap scores. Continue to use the
+official AffectGPT scorer for published EMER comparisons. For downstream
+compatibility, this command also writes `output_Emotion-LLaMA.csv` with the
+legacy `names,chi_reasons` columns.
 
 ### EMER Metrics
 
@@ -215,6 +261,21 @@ ckpt: "/path/to/checkpoints/save_checkpoint/stage2/MER2024-best.pth"
 ```
 
 **Step 2**: Run evaluation on MER2024-NOISE:
+
+Configure the MER2024 block with the benchmark labels and resources. Relative
+transcript and feature paths resolve from the annotation directory:
+
+```yaml
+evaluation_datasets:
+  mer2024_caption:
+    eval_file_path: /path/to/MER2024/test.txt
+    img_path: /path/to/MER2024/videos
+    labels: [neutral, angry, happy, sad, worried, surprise, fear, contempt, doubt]
+    transcription_path: transcription_all_new.csv  # optional
+    face_feature_path: mae_340_23_UTT
+    video_feature_path: maeVideo_399_23_UTT
+    audio_feature_path: HL_23_UTT
+```
 
 ```bash
 torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset mer2024_caption
@@ -325,13 +386,17 @@ Recall = True Positives / (True Positives + False Negatives)
 F1 = 2 * (Precision * Recall) / (Precision + Recall)
 ```
 
+The evaluator reports both macro and support-weighted precision, recall, and
+F1. The confusion matrix uses configured labels as rows and configured labels
+plus `__invalid__` as columns. Zero-support classes receive finite zero scores,
+so `metrics.json` never contains `NaN`.
+
 ### Reasoning Metrics
 
-**Clue Overlap**: Semantic similarity between generated and ground-truth emotional cues
-
-**Label Overlap**: Agreement on emotion labels with partial credit for similar emotions
-
-**BLEU/ROUGE**: Text generation quality metrics
+The built-in reasoning evaluator reports normalized exact match and
+whitespace-token precision, recall, and F1. These metrics are reproducible
+diagnostics for validation and checkpoint selection; they do not replace the
+official semantic Clue Overlap and Label Overlap evaluation.
 
 ---
 
