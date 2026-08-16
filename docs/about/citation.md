@@ -209,7 +209,7 @@ on the MERR dataset for enhanced emotion reasoning.
 
 Support our project by giving it a star on GitHub!
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ZebangCheng/Emotion-LLaMA&type=Date)](https://www.star-history.com/#ZebangCheng/Emotion-LLaMA&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=ZebangCheng/Emotion-LLaMA&type=Date)](https://star-history.dera.page/#ZebangCheng/Emotion-LLaMA&Date)
 
 ---
 
