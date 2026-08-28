@@ -2,6 +2,9 @@
 
 [<img alt="Open In Colab" class="!m-0" src="https://colab.research.google.com/assets/colab-badge.svg">](https://colab.research.google.com/drive/1YTSadgBRfn75wpgpor8_mYWcM6TUPF-i?usp=sharing)
 
+[![Papers with Code: SOTA on MER2023-SEMI (6-class)](https://paperswithcode.co/api/v1/papers/2406.11161/leaderboard-badge.svg?eval=24913&live=1)](https://paperswithcode.co/api/v1/papers/2406.11161/leaderboard-badge-link?eval=24913)
+[![Papers with Code: SOTA on MER2024-NOISE (6-class)](https://paperswithcode.co/api/v1/papers/2406.11161/leaderboard-badge.svg?eval=24914&live=1)](https://paperswithcode.co/api/v1/papers/2406.11161/leaderboard-badge-link?eval=24914)
+
 ## 📢 News
 [2025.10.30] 📚📚📚 We release comprehensive documentation site! Check out our [📖 Documentation](https://zebangcheng.github.io/Emotion-LLaMA/)!  
 [2025.07.09] 🔥🔥🔥 We release the MERR dataset construction strategy at [MER-Factory](https://github.com/Lum1104/MER-Factory)!  
