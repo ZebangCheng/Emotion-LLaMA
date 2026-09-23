@@ -251,6 +251,10 @@ def evaluate_classification(records, labels=None, aliases=None):
         "accuracy": _safe_divide(correct_count, sample_count),
         "macro_precision": macro_precision,
         "macro_recall": macro_recall,
+        # DFEW and other FER benchmarks report the same two numbers as UAR
+        # (mean per-class recall) and WAR (overall accuracy).
+        "uar": macro_recall,
+        "war": _safe_divide(correct_count, sample_count),
         "macro_f1": macro_f1,
         "weighted_precision": weighted_precision,
         "weighted_recall": weighted_recall,

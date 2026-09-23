@@ -41,9 +41,33 @@ evaluation_datasets:
     video_feature_path: maeV_399_UTT
     audio_feature_path: HL-UTT
 
-    # eval_file_path: /home/user/selected_face/DFEW/reltive_DFEW_set_1_test.txt
-    # img_path: /home/user/selected_face/DFEW/images     
+    max_new_tokens: 500
+    batch_size: 1
 
+  # DFEW zero-shot. Run with --dataset dfew --zero_shot and a checkpoint that
+  # was not fine-tuned on DFEW. Relative feature paths resolve against the
+  # directory holding eval_file_path. See docs/evaluation/dfew-zero-shot.md;
+  # the label order and the omitted transcription_path are part of the recipe.
+  dfew:
+    eval_file_path: /path/to/DFEW/reltive_DFEW_set_1_test.txt
+    img_path: /path/to/DFEW/video
+    task_pool: [emotion]
+    labels: [happy, sad, neutral, angry, surprise, disgust, fear]
+    annotation_format: auto
+    face_feature_path: features/mae_DFEW_ck16_UTT
+    video_feature_path: features/maeV_399_UTT
+    audio_feature_path: features/HL-UTT
+    frame_selection: middle
+    # The MER2023 checkpoint answers in its own six-class vocabulary; these
+    # aliases are only applied under --zero_shot.
+    zero_shot_label_aliases:
+      worried: fear
+      anger: angry
+      happiness: happy
+      sadness: sad
+      surprised: surprise
+      disgusted: disgust
+      fearful: fear
     max_new_tokens: 500
     batch_size: 1
 

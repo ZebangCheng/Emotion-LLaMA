@@ -19,8 +19,20 @@ DATASET_MODULE_PATH = (
 
 
 class StubVideoCapture:
+    frame_count = 10
+    seeks = []
+
     def __init__(self, video_path):
         self.video_path = video_path
+        self.position = 0
+
+    def get(self, property_id):
+        return float(type(self).frame_count)
+
+    def set(self, property_id, value):
+        self.position = int(value)
+        type(self).seeks.append(int(value))
+        return True
 
     def read(self):
         return True, np.zeros((2, 2, 3), dtype=np.uint8)
@@ -49,6 +61,8 @@ def load_dataset_module():
     original_cv2 = sys.modules.get("cv2")
     cv2_stub = types.ModuleType("cv2")
     cv2_stub.COLOR_BGR2RGB = 0
+    cv2_stub.CAP_PROP_FRAME_COUNT = 7
+    cv2_stub.CAP_PROP_POS_FRAMES = 1
     cv2_stub.VideoCapture = StubVideoCapture
     cv2_stub.cvtColor = lambda frame, conversion: frame
     sys.modules["cv2"] = cv2_stub
@@ -438,6 +452,46 @@ class FeatureFaceDatasetTest(unittest.TestCase):
         self.assertEqual(first["instance_id"], second["instance_id"])
         self.assertEqual(first["instruction_input"], second["instruction_input"])
 
+    def test_frame_selection_seeks_to_the_configured_frame(self):
+        peak_path = Path(self.root, "peak.json")
+        peak_path.write_text('{"sample": {"peak_index": 4}}', encoding="utf-8")
+        cases = (("first", []), ("middle", [5]), ("peak", [4]))
+        for frame_selection, expected_seeks in cases:
+            with self.subTest(frame_selection=frame_selection):
+                StubVideoCapture.seeks = []
+                dataset = self.make_dataset(
+                    vis_processor=identity,
+                    text_processor=identity,
+                    task_pool=["emotion"],
+                    transcription_path=None,
+                    face_feature_path="face",
+                    video_feature_path="video",
+                    audio_feature_path="audio",
+                    frame_selection=frame_selection,
+                    peak_index_path="peak.json" if frame_selection == "peak" else None,
+                )
+
+                dataset[0]
+
+                self.assertEqual(StubVideoCapture.seeks, expected_seeks)
+        StubVideoCapture.seeks = []
+
+    def test_peak_frame_selection_requires_a_peak_index_file(self):
+        with self.assertRaisesRegex(ValueError, "peak_index_path is required"):
+            self.make_dataset(
+                task_pool=["emotion"],
+                transcription_path=None,
+                frame_selection="peak",
+            )
+
+    def test_frame_selection_rejects_unknown_values(self):
+        with self.assertRaisesRegex(ValueError, "frame_selection must be one of"):
+            self.make_dataset(
+                task_pool=["emotion"],
+                transcription_path=None,
+                frame_selection="last",
+            )
+
     def test_evaluation_mode_requires_one_task(self):
         with self.assertRaisesRegex(ValueError, "exactly one task"):
             self.make_dataset(
@@ -465,6 +519,65 @@ class FeatureFaceDatasetTest(unittest.TestCase):
         self.assertEqual(dataset.labels, ["calm", "excited"])
         self.assertEqual(sample["answer"], "calm")
         self.assertIn("calm, excited", sample["instruction_input"])
+
+    def test_prompt_labels_replace_the_instruction_candidate_list(self):
+        dataset = self.make_dataset(
+            annotation_text="sample calm\n",
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            labels=["calm", "excited"],
+            prompt_labels=["excited", "calm", "restless"],
+            transcription_path=None,
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+            evaluation_mode=True,
+        )
+
+        sample = dataset[0]
+
+        self.assertEqual(dataset.labels, ["calm", "excited"])
+        self.assertIn("excited, calm, restless", sample["instruction_input"])
+
+    def test_numeric_transcript_names_match_string_sample_ids(self):
+        Path(self.root, "numeric-transcript.csv").write_text(
+            "name,sentence\n1,hello there\n", encoding="utf-8"
+        )
+        np.save(Path(self.root, "face", "1.npy"), np.array([[1.0]]))
+        np.save(Path(self.root, "video", "1.npy"), np.array([[2.0]]))
+        np.save(Path(self.root, "audio", "1.npy"), np.array([[3.0]]))
+        dataset = self.make_dataset(
+            annotation_text="1 neutral\n",
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            transcription_path="numeric-transcript.csv",
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+        )
+
+        self.assertIn("hello there", dataset[0]["instruction_input"])
+
+    def test_missing_transcript_sentence_becomes_an_empty_spoken_line(self):
+        Path(self.root, "empty-transcript.csv").write_text(
+            "name,sentence\nsample,\n", encoding="utf-8"
+        )
+        dataset = self.make_dataset(
+            vis_processor=identity,
+            text_processor=identity,
+            task_pool=["emotion"],
+            transcription_path="empty-transcript.csv",
+            face_feature_path="face",
+            video_feature_path="video",
+            audio_feature_path="audio",
+        )
+
+        instruction = dataset[0]["instruction_input"]
+
+        self.assertIn("The person in video says: .", instruction)
+        self.assertNotIn("nan", instruction)
 
     def test_transcript_requires_name_and_sentence_columns(self):
         invalid_transcripts = {
@@ -575,6 +688,21 @@ class FeatureFaceDatasetTest(unittest.TestCase):
         )
 
         self.assertIs(kwargs["labels"], labels)
+
+    def test_dataset_kwargs_forward_zero_shot_frame_and_prompt_options(self):
+        prompt_labels = ["excited", "calm"]
+        kwargs = self.dataset_module.feature_face_dataset_kwargs(
+            {
+                "prompt_labels": prompt_labels,
+                "frame_selection": "peak",
+                "peak_index_path": "DFEW_peak.json",
+            },
+            {"peak_index_path": "DFEW_peak.json"},
+        )
+
+        self.assertIs(kwargs["prompt_labels"], prompt_labels)
+        self.assertEqual(kwargs["frame_selection"], "peak")
+        self.assertEqual(kwargs["peak_index_path"], "DFEW_peak.json")
 
 
 class FeatureFaceConfigForwardingTest(unittest.TestCase):
@@ -870,6 +998,16 @@ class FeatureFaceConfigForwardingTest(unittest.TestCase):
             path_keys | {"eval_file_path", "img_path"}
             <= set(mer2024_evaluation)
         )
+
+        dfew_evaluation = load_config("eval_configs/eval_emotion.yaml")[
+            "evaluation_datasets"
+        ]["dfew"]
+        self.assertEqual(
+            dfew_evaluation["labels"],
+            ["happy", "sad", "neutral", "angry", "surprise", "disgust", "fear"],
+        )
+        self.assertEqual(dfew_evaluation["frame_selection"], "middle")
+        self.assertNotIn("transcription_path", dfew_evaluation)
 
 
 if __name__ == "__main__":

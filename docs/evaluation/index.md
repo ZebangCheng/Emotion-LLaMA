@@ -2,6 +2,7 @@
 layout: default
 title: Evaluation
 nav_order: 5
+has_children: true
 permalink: /evaluation/
 ---
 
@@ -300,12 +301,19 @@ Zero-shot evaluation on DFEW (Dynamic Facial Expression in the Wild):
 
 ### Zero-shot Evaluation
 
-Emotion-LLaMA demonstrates strong generalization without fine-tuning on DFEW:
+Emotion-LLaMA demonstrates strong generalization without fine-tuning on DFEW.
+Evaluate the `DFEW_zero-shot.pth` checkpoint with the `dfew` entry of
+`eval_configs/eval_emotion.yaml`:
 
 ```bash
 # No fine-tuning needed - direct evaluation
-torchrun --nproc_per_node 1 eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset dfew --zero_shot
+python eval_emotion.py --cfg-path eval_configs/eval_emotion.yaml --dataset dfew --zero_shot --output-dir results
 ```
+
+The label order, the frame selection, and the absence of a transcript in that
+config entry each move the score by a measurable amount. See the
+[DFEW Zero-shot Reproduction]({{ site.baseurl }}/evaluation/dfew-zero-shot/)
+guide for the required downloads, the full configuration, and the ablations.
 
 ---
 

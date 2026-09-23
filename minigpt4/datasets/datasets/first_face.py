@@ -21,6 +21,9 @@ FEATURE_FACE_PATH_KEYS = (
 )
 SUPPORTED_TASKS = ("emotion", "reason", "reason_v2")
 ANNOTATION_FORMATS = ("auto", "ne", "ncev")
+# Which single frame represents the clip: its first frame, its midpoint, or
+# the AU-based emotional peak frame listed in peak_index_path.
+FRAME_SELECTIONS = ("first", "middle", "peak")
 DEFAULT_EMOTION_LABELS = (
     "neutral",
     "angry",
@@ -55,6 +58,15 @@ def feature_face_dataset_kwargs(dataset_config, path_config=None):
     labels = dataset_config.get("labels", None)
     if labels is not None:
         kwargs["labels"] = labels
+    prompt_labels = dataset_config.get("prompt_labels", None)
+    if prompt_labels is not None:
+        kwargs["prompt_labels"] = prompt_labels
+    frame_selection = dataset_config.get("frame_selection", None)
+    if frame_selection is not None:
+        kwargs["frame_selection"] = frame_selection
+    peak_index_path = path_config.get("peak_index_path", None)
+    if peak_index_path is not None:
+        kwargs["peak_index_path"] = peak_index_path
     for key in FEATURE_FACE_PATH_KEYS:
         value = path_config.get(key, None)
         if value is not None:
@@ -100,7 +112,11 @@ def _get_transcript_sentence(character_lines, video_name):
     ]
     if sentences.empty:
         raise KeyError("No transcript sentence found for sample {!r}".format(video_name))
-    return sentences.iloc[0]
+    sentence = sentences.iloc[0]
+    # A clip with no speech has an empty cell, which pandas reads as NaN.
+    if pd.isna(sentence):
+        return ""
+    return sentence
 
 
 def _validate_annotation_format(annotation_format):
@@ -143,6 +159,9 @@ class FeatureFaceDataset(Dataset):
         video_feature_path="maeV_399_UTT",
         audio_feature_path="HL-UTT",
         labels=None,
+        prompt_labels=None,
+        frame_selection="first",
+        peak_index_path=None,
         evaluation_mode=False,
         split="train",
     ):
@@ -153,6 +172,18 @@ class FeatureFaceDataset(Dataset):
         self.text_processor = text_processor
         self.task_pool = _validate_task_pool(task_pool)
         self.labels = _validate_labels(labels)
+        # The candidate list shown in the prompt. Under zero-shot transfer the
+        # checkpoint's own label vocabulary may differ from the target
+        # dataset's; scoring still uses self.labels.
+        self.prompt_labels = (
+            self.labels if prompt_labels is None else _validate_labels(prompt_labels)
+        )
+        if frame_selection not in FRAME_SELECTIONS:
+            raise ValueError(
+                "frame_selection must be one of {}".format(FRAME_SELECTIONS)
+            )
+        self.frame_selection = frame_selection
+        self.peak_indexes = None
         self.evaluation_mode = bool(evaluation_mode)
         self.split = str(split)
         if self.evaluation_mode and len(set(self.task_pool)) != 1:
@@ -173,7 +204,7 @@ class FeatureFaceDataset(Dataset):
 
         self.emotion_instruction_pool = [
             "Please determine which emotion label in the video represents: {}.".format(
-                ", ".join(self.labels)
+                ", ".join(self.prompt_labels)
             ),
 
             # "Please determine which emotion label in the video represents: happy, sad, neutral, angry, worried, surprise.",
@@ -210,6 +241,16 @@ class FeatureFaceDataset(Dataset):
         self.audio_feature_path = _resolve_dataset_path(
             audio_feature_path, self.file_path
         )
+        if self.frame_selection == "peak":
+            if peak_index_path is None:
+                raise ValueError(
+                    "peak_index_path is required when frame_selection is 'peak'"
+                )
+            with open(
+                _resolve_dataset_path(peak_index_path, self.file_path), "r"
+            ) as peak_file:
+                self.peak_indexes = json.load(peak_file)
+
         self.emo2idx, self.idx2emo = {}, {}
         for ii, emo in enumerate(self.labels): self.emo2idx[emo] = ii
         for ii, emo in enumerate(self.labels): self.idx2emo[ii] = emo
@@ -251,7 +292,7 @@ class FeatureFaceDataset(Dataset):
 
         self.character_lines = None
         if transcription_path is not None:
-            character_lines = pd.read_csv(transcription_path)
+            character_lines = pd.read_csv(transcription_path, dtype={"name": str})
             required_columns = ("name", "sentence")
             missing_columns = [
                 column for column in required_columns if column not in character_lines.columns
@@ -273,10 +314,10 @@ class FeatureFaceDataset(Dataset):
 
         video_path = os.path.join(self.vis_root, video_name + ".mp4")
         if os.path.exists(video_path):
-            image = self.extract_frame(video_path)
+            image = self.extract_frame(video_path, video_name)
         else:
             video_path = os.path.join(self.vis_root, video_name + ".avi")
-            image = self.extract_frame(video_path)
+            image = self.extract_frame(video_path, video_name)
 
         image = Image.fromarray(image.astype('uint8'))
         image = image.convert('RGB')
@@ -361,9 +402,30 @@ class FeatureFaceDataset(Dataset):
             )
         return sample
     
-    def extract_frame(self, video_path):
+    def extract_frame(self, video_path, video_name=None):
         video_capture = cv2.VideoCapture(video_path)
+        target_index = None
+        if self.frame_selection == "middle":
+            frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            if frame_count > 1:
+                target_index = frame_count // 2
+        elif self.frame_selection == "peak":
+            entry = self.peak_indexes.get(str(video_name))
+            if entry is None:
+                raise KeyError(
+                    "No peak index found for sample {!r}".format(video_name)
+                )
+            frame_count = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            target_index = int(entry["peak_index"])
+            if frame_count > 0:
+                target_index = min(target_index, frame_count - 1)
+        if target_index:
+            video_capture.set(cv2.CAP_PROP_POS_FRAMES, target_index)
         success, frame = video_capture.read()
+        if not success and target_index:
+            # Seeking can fail on a damaged index; fall back to the first frame.
+            video_capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            success, frame = video_capture.read()
         if not success:
             raise ValueError("Failed to read video file:", video_path)
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
