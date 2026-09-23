@@ -30,7 +30,12 @@ from minigpt4.evaluation.evaluator import (
 from minigpt4.evaluation.prompting import prepare_conversation_texts
 
 
-SUPPORTED_DATASETS = ("feature_face_caption", "mer2024_caption")
+SUPPORTED_DATASETS = ("feature_face_caption", "mer2024_caption", "dfew")
+
+# Datasets whose samples are built by FeatureFaceDataset. DFEW reuses that
+# loader: the only differences are the annotation file, the feature trees, and
+# the label set, all of which come from the YAML config.
+FEATURE_FACE_DATASETS = ("feature_face_caption", "dfew")
 
 
 def comma_separated_values(value):
@@ -57,6 +62,15 @@ def build_parser(default_task="classification"):
         help="artifact root; defaults to run.save_path from the YAML config",
     )
     parser.add_argument("--device", default="cuda:0", help="model device")
+    parser.add_argument(
+        "--zero_shot",
+        action="store_true",
+        help=(
+            "evaluate a dataset the checkpoint was not fine-tuned on: records "
+            "the run as zero-shot and applies the dataset's "
+            "zero_shot_label_aliases when mapping generated text to labels"
+        ),
+    )
     parser.add_argument("--res", type=float, default=100.0, help=argparse.SUPPRESS)
     parser.add_argument("--resample", action="store_true", help=argparse.SUPPRESS)
     return parser
@@ -90,7 +104,7 @@ def _build_dataset(cfg, dataset_name, vis_processor, text_processor):
             )
         )
     dataset_cfg = cfg.evaluation_datasets_cfg[dataset_name]
-    if dataset_name == "feature_face_caption":
+    if dataset_name in FEATURE_FACE_DATASETS:
         dataset = FeatureFaceDataset(
             vis_processor,
             text_processor,
@@ -211,7 +225,20 @@ def _write_legacy_reasoning_csv(records, output_dir):
     return str(path)
 
 
-def run_dataset(model, cfg, dataset_name, task, output_root):
+def _evaluation_aliases(dataset_cfg, zero_shot):
+    """Merge the dataset aliases with the zero-shot ones when requested."""
+    aliases = dataset_cfg.get("label_aliases", None)
+    if not zero_shot:
+        return aliases
+    zero_shot_aliases = dataset_cfg.get("zero_shot_label_aliases", None)
+    if zero_shot_aliases is None:
+        return aliases
+    merged = dict(aliases or {})
+    merged.update(dict(zero_shot_aliases))
+    return merged
+
+
+def run_dataset(model, cfg, dataset_name, task, output_root, zero_shot=False):
     training_dataset_cfg = cfg.datasets_cfg.get(dataset_name)
     if training_dataset_cfg is None:
         training_dataset_cfg = cfg.datasets_cfg[list(cfg.datasets_cfg.keys())[0]]
@@ -227,8 +254,9 @@ def run_dataset(model, cfg, dataset_name, task, output_root):
     )
     records = _generate_records(model, data_loader, dataset_name, dataset_cfg)
     labels = dataset_cfg.get("labels", getattr(dataset, "labels", None))
-    aliases = dataset_cfg.get("label_aliases", None)
+    aliases = _evaluation_aliases(dataset_cfg, zero_shot)
     report = evaluate_records(records, task=task, labels=labels, aliases=aliases)
+    report["metrics"]["zero_shot"] = bool(zero_shot)
     output_dir = Path(output_root) / dataset_name
     paths = write_evaluation_report(report, output_dir)
     if report["metrics"]["task"] == "reasoning":
@@ -250,5 +278,12 @@ def main(argv=None, default_task="classification"):
 
     model = _initialize_model(cfg, args.device)
     for dataset_name in args.dataset:
-        run_dataset(model, cfg, dataset_name, args.task, output_root)
+        run_dataset(
+            model,
+            cfg,
+            dataset_name,
+            args.task,
+            output_root,
+            zero_shot=args.zero_shot,
+        )
     return 0

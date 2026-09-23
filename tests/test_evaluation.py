@@ -124,6 +124,8 @@ class ClassificationEvaluationTests(unittest.TestCase):
         metrics = report["metrics"]
 
         self.assertAlmostEqual(metrics["accuracy"], 0.5)
+        self.assertAlmostEqual(metrics["war"], metrics["accuracy"])
+        self.assertAlmostEqual(metrics["uar"], metrics["macro_recall"])
         self.assertAlmostEqual(metrics["macro_f1"], 4.0 / 9.0)
         self.assertAlmostEqual(metrics["weighted_f1"], 0.5)
         self.assertAlmostEqual(metrics["invalid_rate"], 0.25)
